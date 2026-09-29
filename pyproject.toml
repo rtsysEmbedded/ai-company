@@ -2,4 +2,12 @@
 name = "ai-company"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.141.1",
+    "huggingface-hub>=1.33.0",
+    "mlx>=0.32.3",
+    "mlx-embeddings>=0.1.0",
+    "mlx-lm>=0.31.3",
+    "pyyaml>=6.0.3",
+    "uvicorn[standard]>=0.54.0",
+]
