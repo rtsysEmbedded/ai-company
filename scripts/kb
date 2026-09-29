@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Knowledge base CLI: scripts/kb ingest | search "query" | status
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PYTHONPATH="$ROOT/services/kb" exec uv run --project "$ROOT" -q python -m kb "$@"

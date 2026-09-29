@@ -1,0 +1,21 @@
+# Retrieval test set: query -> expected source file (relative to corpus/).
+- {q: "how do I configure the uart baud rate", expect: docs/uart-driver-guide.md}
+- {q: "receive variable length frames with DMA idle line", expect: docs/uart-driver-guide.md}
+- {q: "how to clear overrun error ORE", expect: docs/uart-driver-guide.md}
+- {q: "CAN bit timing for 500 kbit/s", expect: docs/can-bus-notes.md}
+- {q: "CAN acceptance filter mask mode", expect: docs/can-bus-notes.md}
+- {q: "welche Toolchain Version benutzen wir", expect: docs/entwicklungsumgebung.md}
+- {q: "how do we flash the firmware with openocd", expect: docs/entwicklungsumgebung.md}
+- {q: "why did we choose FreeRTOS over Zephyr", expect: decisions/adr-003-rtos.md}
+- {q: "are we allowed to allocate memory dynamically in tasks", expect: decisions/adr-003-rtos.md}
+- {q: "what frontend framework does the dashboard use", expect: decisions/adr-007-web-stack.md}
+- {q: "where are JWT tokens stored in the browser", expect: decisions/adr-007-web-stack.md}
+- {q: "rb_push", expect: code/ring_buffer.c}
+- {q: "what happens when the uart receive ring buffer is full", expect: code/ring_buffer.c}
+- {q: "PID anti windup integral clamp", expect: code/pid.c}
+- {q: "reset the controller integral term", expect: code/pid.c}
+- {q: "API endpoint to get device configuration", expect: code/gateway_api.py}
+- {q: "how is the OTA firmware image verified", expect: code/gateway_api.py}
+- {q: "TMP117 I2C address", expect: datasheets/tmp117.pdf}
+- {q: "temperature register resolution per LSB", expect: datasheets/tmp117.pdf}
+- {q: "maximum ISR duration rule", expect: docs/coding-standard.md}
