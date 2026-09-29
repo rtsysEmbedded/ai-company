@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Start the knowledge-base MCP server (stdio). Used by every Hermes profile.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+export PYTHONPATH="$ROOT/services/kb"
+export LANCE_LOG="${LANCE_LOG:-error}" RUST_LOG="${RUST_LOG:-error}"
+exec uv run --project "$ROOT" -q python -m kb.mcp_server
