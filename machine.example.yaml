@@ -1,0 +1,12 @@
+# Per-machine settings. Copy to machine.yaml (gitignored).
+embedder:
+  backend: mlx            # mlx | ollama | openai-compatible
+  url: http://127.0.0.1:8765/v1
+  embed_model: mlx-community/Qwen3-Embedding-4B-4bit-DWQ
+  rerank_model: mlx-community/Qwen3-Reranker-0.6B-4bit
+enrichment:
+  backend: afm            # afm | openrouter | none
+  fallback_model: qwen/qwen3.8-flash
+paths:
+  index: data/index
+private_folders: []       # knowledge/ subfolders never sent to cloud models

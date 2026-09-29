@@ -1,0 +1,59 @@
+# Single source of truth for the agent team. Apply with: scripts/apply_team.py
+# Prices checked 2026-09-29 (USD per 1M tokens, in/out).
+provider: openrouter
+roles:
+  manager:
+    hermes_profile: default
+    model: deepseek/deepseek-v4-pro-0813      # 0.40 / 4.20
+    fallback: openai/gpt-5.6-luna-pro
+    effort: medium
+    key_env: OPENROUTER_KEY_MANAGER
+    description: Manager. Plans coding work, splits it into tasks and routes each to the right specialist.
+  frontend:
+    model: google/gemini-3.8-flash            # 0.75 / 3.75
+    fallback: anthropic/claude-sonnet-5.5
+    effort: high
+    key_env: OPENROUTER_KEY_FRONTEND
+    description: Web interfaces - HTML/CSS/JS, React/Vue, UI layout and styling, reads screenshots and mockups.
+  backend:
+    model: moonshotai/kimi-k2.7-code          # 0.66 / 3.30
+    fallback: deepseek/deepseek-v4-pro-0813
+    effort: medium
+    key_env: OPENROUTER_KEY_BACKEND
+    description: Main coder - features, APIs, C/Python/embedded logic, multi-file refactors.
+  debugger:
+    model: z-ai/glm-5.3                       # 1.40 / 4.40
+    fallback: anthropic/claude-sonnet-5.5
+    effort: high
+    key_env: OPENROUTER_KEY_DEBUGGER
+    description: Debugging - reproduces bugs, reads stack traces and logs, finds root cause, applies minimal fixes.
+  security:
+    model: anthropic/claude-sonnet-5.5        # 2.00 / 10.00
+    fallback: openai/gpt-5.6-terra
+    effort: high
+    key_env: OPENROUTER_KEY_SECURITY
+    description: Security analysis - audits for vulnerabilities, secrets, auth flaws and risky dependencies. Read-only unless told to fix.
+  reviewer:
+    model: openai/gpt-5.6-terra               # 2.00 / 12.00
+    fallback: anthropic/claude-sonnet-5.5
+    effort: high
+    key_env: OPENROUTER_KEY_REVIEWER
+    description: Code review - checks diffs for correctness bugs, edge cases and style before merge.
+  tester:
+    model: qwen/qwen3.8-flash                 # 0.15 / 0.47
+    fallback: deepseek/deepseek-v4-flash
+    effort: medium
+    key_env: OPENROUTER_KEY_TESTER
+    description: Writes and runs unit tests; writes docs, READMEs and comments.
+  shell:
+    model: deepseek/deepseek-v4-flash         # 0.14 / 0.28
+    fallback: qwen/qwen3.8-flash
+    effort: low
+    key_env: OPENROUTER_KEY_SHELL
+    description: Simple command tasks - git, file moves, installs, running builds, quick questions. Cheapest.
+  architect:
+    model: anthropic/claude-opus-5.5          # 4.00 / 20.00
+    fallback: openai/gpt-5.6-sol
+    effort: high
+    key_env: OPENROUTER_KEY_ARCHITECT
+    description: Escalation only - hard architecture decisions or tasks other agents failed twice. Most expensive.
