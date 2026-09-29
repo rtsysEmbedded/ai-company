@@ -85,7 +85,8 @@ def ingest(base: str = KNOWLEDGE, enrich=None, log=print) -> Dict[str, int]:
         pieces = chunk_file(path)
         summary, tags = enrich(path, "\n".join(c.text for c in pieces)[:12000]) if enrich and pieces else ("", "")
         # Embed with a context header so a chunk knows which file/section it came from.
-        texts = [f"{rel} > {c.section}\n{c.text}" for c in pieces]
+        header = f"{summary}\nTags: {tags}\n" if summary or tags else ""
+        texts = [f"{rel} > {c.section}\n{header}{c.text}" for c in pieces]
         vecs = embedder.embed(texts) if texts else []
         chunks_t.delete(f"path = '{_esc(rel)}'")
         files_t.delete(f"path = '{_esc(rel)}'")
