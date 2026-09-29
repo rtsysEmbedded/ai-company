@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Company Panel</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f6f4; --surface: #ffffff; --text: #1b1b1a; --muted: #6b6b66; --line: #e2e1dc;
+    --accent: #2f6fdd; --accent-soft: #e6eefc; --good: #1f8a4c; --warn: #b7791f; --bad: #c43b3b;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161615; --surface: #1f1f1d; --text: #ecebe6; --muted: #9c9b94; --line: #33322f;
+            --accent: #7aa7ff; --accent-soft: #22304a; --good: #4cc27f; --warn: #e3a948; --bad: #ef6b6b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--surface); position: sticky; top: 0; z-index: 2; }
+  header h1 { font-size: 16px; margin: 0; }
+  nav { display: flex; gap: 4px; flex-wrap: wrap; }
+  nav button { border: 0; background: none; color: var(--muted); padding: 6px 12px; border-radius: 8px; font: inherit; cursor: pointer; }
+  nav button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .badge { display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 9px; background: var(--warn); color: #fff; font-size: 11px; margin-left: 4px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 24px; }
+  section[hidden] { display: none; }
+  h2 { font-size: 18px; margin: 0 0 4px; }
+  p.lead { color: var(--muted); margin: 0 0 16px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; }
+  input, select, textarea { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; }
+  textarea { font-family: var(--mono); font-size: 13px; min-height: 360px; resize: vertical; }
+  button.btn { font: inherit; border: 1px solid var(--line); background: var(--surface); color: var(--text); padding: 6px 14px; border-radius: 8px; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { color: var(--bad); }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .grow { flex: 1; }
+  .muted { color: var(--muted); }
+  .mono { font-family: var(--mono); font-size: 12.5px; }
+  .ok { color: var(--good); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; min-width: 120px; }
+  .bar > i { display: block; height: 100%; background: var(--good); }
+  .bar > i.hi { background: var(--warn); } .bar > i.full { background: var(--bad); }
+  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; max-height: 420px; font-size: 12.5px; }
+  .split { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
+  .list button { display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--text); padding: 6px 8px; border-radius: 6px; cursor: pointer; font: inherit; }
+  .list button[aria-current="true"] { background: var(--accent-soft); color: var(--accent); }
+  .hit { border-bottom: 1px solid var(--line); padding: 10px 0; }
+  .hit:last-child { border: 0; }
+  dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); max-width: 560px; width: 90vw; }
+  dialog::backdrop { background: rgb(0 0 0 / .4); }
+  #toast { position: fixed; bottom: 20px; right: 20px; background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  .dirty td:first-child { box-shadow: inset 3px 0 var(--warn); }
+  @media (max-width: 760px) { .split { grid-template-columns: 1fr; } main { padding: 16px; } .hide-sm { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>AI Company</h1>
+  <nav role="tablist">
+    <button role="tab" data-tab="team" aria-selected="true">Team</button>
+    <button role="tab" data-tab="policies">Policies</button>
+    <button role="tab" data-tab="keys">Keys &amp; budget</button>
+    <button role="tab" data-tab="kb">Knowledge</button>
+    <button role="tab" data-tab="services">Services</button>
+    <button role="tab" data-tab="apply">Apply<span id="pendingBadge" class="badge" hidden>!</span></button>
+  </nav>
+</header>
+
+<main>
+  <section id="tab-team">
+    <h2>Team</h2>
+    <p class="lead">Model, fallback and reasoning per role. Changes are saved to <span class="mono">team.yaml</span>; go to <b>Apply</b> to push them to Hermes. "≈/call" assumes about 17k input and 500 output tokens.</p>
+    <div class="card"><table id="teamTable">
+      <thead><tr><th>Role</th><th>Model</th><th>Fallback</th><th>Effort</th><th class="hide-sm">Description (used for routing)</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <datalist id="modelList"></datalist>
+  </section>
+
+  <section id="tab-policies" hidden>
+    <h2>Policies</h2>
+    <p class="lead">Rules injected into every agent's instructions. Keep them short; long rulebooks belong in <span class="mono">knowledge/policies-full/</span>.</p>
+    <div class="split">
+      <div class="card list" id="policyList"></div>
+      <div class="card">
+        <div class="row" style="margin-bottom:8px"><b id="policyName" class="grow mono"></b><span id="policyChars" class="muted"></span><button class="btn primary" id="policySave">Save</button></div>
+        <textarea id="policyText" spellcheck="false"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-keys" hidden>
+    <h2>Keys &amp; budget</h2>
+    <p class="lead">One OpenRouter key per agent. Keys are stored in <span class="mono">.env</span> and never shown in full. Set limits in the OpenRouter panel.</p>
+    <div class="card"><table id="keyTable">
+      <thead><tr><th>Key</th><th>Status</th><th>Used / limit</th><th>Usage</th><th>Reset</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table><p class="muted" id="keyTotal"></p></div>
+  </section>
+
+  <section id="tab-kb" hidden>
+    <h2>Knowledge</h2>
+    <p class="lead">Local knowledge base: files in <span class="mono">knowledge/</span>, indexed on this Mac.</p>
+    <div class="card row" id="kbStatus"></div>
+    <div class="card">
+      <form class="row" id="kbSearchForm"><input class="grow" id="kbQuery" placeholder="Test a search, e.g. HAL_UART_Init or 'why FreeRTOS'"><button class="btn primary">Search</button></form>
+      <div id="kbHits"></div>
+    </div>
+    <div class="card"><h3 style="margin-top:0">Lessons written by agents</h3><div id="lessons"></div></div>
+  </section>
+
+  <section id="tab-services" hidden>
+    <h2>Services</h2>
+    <p class="lead">Health of the local services and the agent profiles.</p>
+    <div class="card" id="svc"></div>
+    <div class="card">
+      <div class="row"><b class="grow">Ping agents</b><span class="muted">one tiny real call each - costs a few cents in total</span><button class="btn" id="pingBtn">Ping all</button></div>
+      <div id="pingOut" class="mono" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <section id="tab-apply" hidden>
+    <h2>Apply</h2>
+    <p class="lead">Review pending changes, then apply them to the Hermes profiles. Every apply is a git commit and can be undone.</p>
+    <div class="card">
+      <div class="row" style="margin-bottom:8px"><input class="grow" id="applyMsg" placeholder="What changed? (commit message)"><button class="btn" id="discardBtn">Discard edits</button><button class="btn primary" id="applyBtn">Apply</button></div>
+      <div id="pendingOut"></div>
+    </div>
+    <div class="card">
+      <div class="row"><b class="grow">History</b><button class="btn danger" id="undoBtn">Undo last panel change</button></div>
+      <pre id="history" class="mono"></pre>
+    </div>
+  </section>
+</main>
+
+<dialog id="confirm">
+  <form method="dialog">
+    <p id="confirmText"></p>
+    <div class="row" style="justify-content:flex-end"><button class="btn" value="no">Cancel</button><button class="btn primary" value="yes">Continue</button></div>
+  </form>
+</dialog>
+<dialog id="keyDialog">
+  <form method="dialog" id="keyForm">
+    <p>New value for <b id="keyName" class="mono"></b>. It is checked with OpenRouter before saving.</p>
+    <input id="keyValue" type="password" autocomplete="off" placeholder="sk-or-v1-..." required>
+    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" value="no" formnovalidate>Cancel</button><button class="btn primary" value="yes">Save key</button></div>
+  </form>
+</dialog>
+<div id="toast" role="status"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function api(path, opts = {}) {
+  const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || r.statusText);
+  return data;
+}
+function toast(msg, bad) { const t = $("#toast"); t.textContent = msg; t.style.background = bad ? "var(--bad)" : ""; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2600); }
+function ask(text) { return new Promise(res => { const d = $("#confirm"); $("#confirmText").textContent = text; d.returnValue = ""; d.onclose = () => res(d.returnValue === "yes"); d.showModal(); }); }
+const money = v => v == null ? "–" : "$" + Number(v).toFixed(v < 1 ? 4 : 2);
+
+// ---- tabs ----
+const loaders = {};
+document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("nav button").forEach(x => x.setAttribute("aria-selected", x === b));
+  document.querySelectorAll("main section").forEach(s => s.hidden = s.id !== "tab-" + b.dataset.tab);
+  try { localStorage.setItem("tab", b.dataset.tab); } catch {}
+  loaders[b.dataset.tab]?.();
+}));
+
+// ---- team ----
+let MODELS = {};
+loaders.team = async () => {
+  const [team, models] = await Promise.all([api("/api/team"), api("/api/models").catch(() => [])]);
+  MODELS = Object.fromEntries(models.map(m => [m.id, m]));
+  $("#modelList").innerHTML = models.map(m => `<option value="${esc(m.id)}">$${m.in} / $${m.out} · ≈$${m.per_call}/call</option>`).join("");
+  const price = id => MODELS[id] ? `<div class="muted mono">$${MODELS[id].in} / $${MODELS[id].out} · ≈$${MODELS[id].per_call}/call</div>` : (id ? `<div class="bad">not on OpenRouter</div>` : "");
+  $("#teamTable tbody").innerHTML = Object.entries(team.roles).map(([role, s]) => `
+    <tr data-role="${esc(role)}">
+      <td><b>${esc(role)}</b><div class="muted mono">${esc(s.key_env)}</div></td>
+      <td><input list="modelList" name="model" value="${esc(s.model)}">${price(s.model)}</td>
+      <td><input list="modelList" name="fallback" value="${esc(s.fallback || "")}">${price(s.fallback)}</td>
+      <td><select name="effort">${["low","medium","high"].map(e => `<option ${e === s.effort ? "selected" : ""}>${e}</option>`).join("")}</select></td>
+      <td class="hide-sm"><textarea name="description" style="min-height:64px;font-family:inherit">${esc(s.description)}</textarea></td>
+      <td><button class="btn" data-save disabled>Save</button></td>
+    </tr>`).join("");
+  document.querySelectorAll("#teamTable tr[data-role]").forEach(tr => {
+    const btn = tr.querySelector("[data-save]");
+    tr.addEventListener("input", () => { btn.disabled = false; tr.classList.add("dirty"); });
+    btn.addEventListener("click", async () => {
+      const v = n => tr.querySelector(`[name=${n}]`).value.trim();
+      try {
+        await api("/api/team/" + tr.dataset.role, { method: "PUT", body: { model: v("model"), fallback: v("fallback"), effort: v("effort"), description: v("description") } });
+        toast(`${tr.dataset.role} saved - go to Apply`); loaders.team(); refreshPending();
+      } catch (e) { toast(e.message, true); }
+    });
+  });
+};
+
+// ---- policies ----
+let currentPolicy = null;
+loaders.policies = async () => {
+  const list = await api("/api/policies");
+  $("#policyList").innerHTML = list.map(p => `<button data-p="${esc(p.path)}">${esc(p.path)} <span class="muted">${p.chars}</span></button>`).join("");
+  $("#policyList").querySelectorAll("button").forEach(b => b.addEventListener("click", () => openPolicy(b.dataset.p)));
+  openPolicy(currentPolicy || list[0]?.path);
+};
+async function openPolicy(path) {
+  if (!path) return;
+  currentPolicy = path;
+  $("#policyList").querySelectorAll("button").forEach(b => b.setAttribute("aria-current", b.dataset.p === path));
+  const p = await api("/api/policies/" + path);
+  $("#policyName").textContent = "policies/" + path; $("#policyText").value = p.text; countChars();
+}
+function countChars() { const n = $("#policyText").value.length; $("#policyChars").textContent = n + " chars"; $("#policyChars").className = n > 4000 ? "warn" : "muted"; }
+$("#policyText").addEventListener("input", countChars);
+$("#policySave").addEventListener("click", async () => {
+  try { await api("/api/policies/" + currentPolicy, { method: "PUT", body: { text: $("#policyText").value } }); toast("Saved - go to Apply"); refreshPending(); }
+  catch (e) { toast(e.message, true); }
+});
+
+// ---- keys ----
+loaders.keys = async () => {
+  $("#keyTable tbody").innerHTML = `<tr><td colspan="6" class="muted">Checking keys with OpenRouter…</td></tr>`;
+  const keys = await api("/api/keys");
+  let used = 0, limit = 0;
+  $("#keyTable tbody").innerHTML = keys.map(k => {
+    used += k.usage || 0; limit += k.limit || 0;
+    const pct = k.limit ? Math.min(100, (k.usage || 0) / k.limit * 100) : 0;
+    const status = !k.masked ? `<span class="muted">empty</span>` : k.valid ? `<span class="ok">valid</span> <span class="muted mono">${esc(k.masked)}</span>` : `<span class="bad">invalid</span>`;
+    return `<tr><td class="mono">${esc(k.name.replace("OPENROUTER_KEY_", ""))}</td><td>${status}</td>
+      <td>${k.valid ? money(k.usage) + " / " + (k.limit == null ? "no limit" : "$" + k.limit) : "–"}</td>
+      <td>${k.valid && k.limit ? `<div class="bar"><i class="${pct > 90 ? "full" : pct > 70 ? "hi" : ""}" style="width:${pct}%"></i></div>` : ""}</td>
+      <td class="muted">${esc(k.reset || "")}</td><td><button class="btn" data-key="${esc(k.name)}">Replace</button></td></tr>`;
+  }).join("");
+  $("#keyTotal").textContent = `Total used ${money(used)} of $${limit} in limits.`;
+  document.querySelectorAll("[data-key]").forEach(b => b.addEventListener("click", () => {
+    $("#keyName").textContent = b.dataset.key; $("#keyValue").value = ""; $("#keyDialog").showModal();
+  }));
+};
+$("#keyDialog").addEventListener("close", async () => {
+  const d = $("#keyDialog"), v = $("#keyValue").value; $("#keyValue").value = "";
+  if (d.returnValue !== "yes" || !v) return;
+  try { await api("/api/keys/" + $("#keyName").textContent, { method: "PUT", body: { value: v } }); toast("Key saved - Apply to push it to the profile"); loaders.keys(); }
+  catch (e) { toast(e.message, true); }
+});
+
+// ---- knowledge ----
+loaders.kb = async () => {
+  const s = await api("/api/kb/status");
+  const job = s.reindex?.state === "running" ? `<span class="warn">reindexing…</span>` : s.reindex?.state === "done" ? `<span class="muted">last reindex ${esc(s.reindex.at)}: +${s.reindex.stats.added} ~${s.reindex.stats.updated} −${s.reindex.stats.removed}</span>` : "";
+  $("#kbStatus").innerHTML = `<div class="grow"><b>${s.files}</b> files · <b>${s.chunks}</b> chunks · <span class="mono">${esc((s.model || "no index yet").split("/").pop())}</span><br>
+    Apple model: ${s.apple_model.available ? `<span class="ok">available</span>` : `<span class="warn">${esc(s.apple_model.reason)}</span>`} ${job}</div>
+    <button class="btn primary" id="reindexBtn">Reindex now</button>`;
+  $("#reindexBtn").onclick = async () => { await api("/api/kb/reindex", { method: "POST" }); toast("Reindex started"); pollReindex(); };
+  const ls = await api("/api/kb/lessons");
+  $("#lessons").innerHTML = ls.length ? ls.map(l => `<details class="hit"><summary><span class="mono">${esc(l.name)}</span> <span class="muted">by ${esc(l.role)}</span></summary><pre>${esc(l.text)}</pre><button class="btn danger" data-del="${esc(l.name)}">Delete</button></details>`).join("") : `<p class="muted">No lessons yet.</p>`;
+  document.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+    if (!await ask(`Delete lesson ${b.dataset.del}?`)) return;
+    await api("/api/kb/lessons/" + b.dataset.del, { method: "DELETE" }); toast("Deleted"); loaders.kb();
+  });
+};
+function pollReindex() { setTimeout(async () => { const s = await api("/api/kb/status"); if (s.reindex?.state === "running") pollReindex(); else { loaders.kb(); toast(s.reindex?.state === "error" ? s.reindex.error : "Reindex done", s.reindex?.state === "error"); } }, 2000); }
+$("#kbSearchForm").addEventListener("submit", async e => {
+  e.preventDefault(); const q = $("#kbQuery").value.trim(); if (!q) return;
+  $("#kbHits").innerHTML = `<p class="muted">Searching…</p>`;
+  try {
+    const hits = await api("/api/kb/search", { method: "POST", body: { query: q } });
+    $("#kbHits").innerHTML = hits.length ? hits.map(h => `<div class="hit"><div class="row"><b class="mono grow">${esc(h.path)} › ${esc(h.section)}</b><span class="muted">${h.score}</span></div>${h.summary ? `<div class="muted">${esc(h.summary)}</div>` : ""}<pre>${esc(h.text.slice(0, 600))}</pre></div>`).join("") : `<p class="muted">No results.</p>`;
+  } catch (err) { $("#kbHits").innerHTML = `<p class="bad">${esc(err.message)}</p>`; }
+});
+
+// ---- services ----
+loaders.services = async () => {
+  const s = await api("/api/services");
+  $("#svc").innerHTML = `<p><b>Embedder</b> ${s.embedder.ok ? `<span class="ok">running</span> <span class="muted mono">${esc(s.embedder.device)} · ${esc(s.embedder.embed_model)}</span>` : `<span class="bad">down - ${esc(s.embedder.error)}</span>`}</p>
+    <p><b>Apple model</b> ${s.apple_model.available ? `<span class="ok">available</span>` : `<span class="warn">${esc(s.apple_model.reason)}</span>`}</p>
+    <pre class="mono">${esc(s.profiles)}</pre>`;
+};
+$("#pingBtn").addEventListener("click", async () => {
+  if (!await ask("Send one tiny real request to each of the 9 agents? This costs a few cents in total and takes about a minute.")) return;
+  const btn = $("#pingBtn"); btn.disabled = true; $("#pingOut").textContent = "pinging…";
+  try {
+    const team = await api("/api/team");
+    const r = await api("/api/ping", { method: "POST", body: { roles: Object.keys(team.roles) } });
+    $("#pingOut").innerHTML = Object.entries(r).map(([k, v]) => `<span class="${v.ok ? "ok" : "bad"}">${v.ok ? "✓" : "✗"}</span> ${esc(k)} <span class="muted">${v.seconds}s</span>`).join("<br>");
+  } catch (e) { $("#pingOut").textContent = e.message; }
+  btn.disabled = false;
+});
+
+// ---- apply ----
+async function refreshPending() {
+  const p = await api("/api/pending");
+  $("#pendingBadge").hidden = !p.diff;
+  return p;
+}
+loaders.apply = async () => {
+  const p = await refreshPending();
+  $("#pendingOut").innerHTML = p.diff ? `<p><b>Pending changes</b></p><pre class="mono">${esc(p.diff)}</pre><p><b>Effect on profiles (dry run)</b></p><pre class="mono">${esc(p.dry_run)}</pre>` : `<p class="muted">No pending changes. Apply can still re-sync profiles (e.g. after replacing a key).</p>`;
+  $("#history").textContent = (await api("/api/history")).join("\n");
+};
+$("#applyBtn").addEventListener("click", async () => {
+  if (!await ask("Apply team.yaml and policies to all Hermes profiles now?")) return;
+  const btn = $("#applyBtn"); btn.disabled = true;
+  try { const r = await api("/api/apply", { method: "POST", body: { message: $("#applyMsg").value } }); $("#applyMsg").value = ""; toast("Applied: " + r.commit); loaders.apply(); }
+  catch (e) { toast(e.message, true); }
+  btn.disabled = false;
+});
+$("#discardBtn").addEventListener("click", async () => {
+  if (!await ask("Discard all unsaved edits to team.yaml and policies?")) return;
+  await api("/api/discard", { method: "POST" }); toast("Discarded"); loaders.apply();
+});
+$("#undoBtn").addEventListener("click", async () => {
+  if (!await ask("Revert the last panel change and re-apply profiles?")) return;
+  try { const r = await api("/api/undo", { method: "POST" }); toast("Reverted: " + r.reverted); loaders.apply(); }
+  catch (e) { toast(e.message, true); }
+});
+
+// ---- start ----
+let start = "team"; try { start = localStorage.getItem("tab") || "team"; } catch {}
+document.querySelector(`nav button[data-tab="${start}"]`)?.click();
+refreshPending().catch(() => {});
+</script>
+</body>
+</html>

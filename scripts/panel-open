@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Open the AI Company Control Panel in the default browser (logs in with the local token).
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+open "http://127.0.0.1:${PANEL_PORT:-8770}/login?token=$(cat "$ROOT/data/panel_token")"
