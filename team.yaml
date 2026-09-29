@@ -48,7 +48,7 @@ roles:
   shell:
     model: deepseek/deepseek-v4-flash         # 0.14 / 0.28
     fallback: qwen/qwen3.8-flash
-    effort: low
+    effort: medium
     key_env: OPENROUTER_KEY_SHELL
     description: Simple command tasks - git, file moves, installs, running builds, quick questions. Cheapest.
   architect:
