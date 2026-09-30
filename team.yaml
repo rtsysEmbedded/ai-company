@@ -51,6 +51,12 @@ roles:
     effort: low
     key_env: OPENROUTER_KEY_SHELL
     description: Simple command tasks - git, file moves, installs, running builds, quick questions. Cheapest.
+  hardware:
+    model: z-ai/glm-5.3                       # 1.40 / 4.40
+    fallback: anthropic/claude-sonnet-5.5
+    effort: high
+    key_env: OPENROUTER_KEY_HARDWARE
+    description: Hardware group - firmware and embedded C/C++, drivers, RTOS, board bring-up, datasheets, secure boot and updates.
   architect:
     model: anthropic/claude-opus-5.5          # 4.00 / 20.00
     fallback: openai/gpt-5.6-sol
