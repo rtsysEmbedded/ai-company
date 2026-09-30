@@ -56,6 +56,9 @@
   dialog::backdrop { background: rgb(0 0 0 / .4); }
   #toast { position: fixed; bottom: 20px; right: 20px; background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
   #toast.show { opacity: 1; }
+  .dropzone { display: block; border: 2px dashed var(--line); border-radius: 10px; padding: 20px; text-align: center; color: var(--muted); cursor: pointer; }
+  .dropzone.over { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .dropzone.disabled { opacity: .5; pointer-events: none; }
   .dirty td:first-child { box-shadow: inset 3px 0 var(--warn); }
   @media (max-width: 760px) { .split { grid-template-columns: 1fr; } main { padding: 16px; } .hide-sm { display: none; } }
 </style>
@@ -112,6 +115,24 @@
     <div class="card">
       <form class="row" id="kbSearchForm"><input class="grow" id="kbQuery" placeholder="Test a search, e.g. HAL_UART_Init or 'why FreeRTOS'"><button class="btn primary">Search</button></form>
       <div id="kbHits"></div>
+    </div>
+    <div class="card">
+      <div class="row" style="margin-bottom:12px"><h3 class="grow" style="margin:0">Library</h3><span id="indexJob" class="muted"></span></div>
+      <div class="split">
+        <div>
+          <div class="list" id="folderList"></div>
+          <form class="row" id="newFolderForm" style="margin-top:8px"><input class="grow" id="newFolder" placeholder="new folder, e.g. datasheets/stm32"><button class="btn">Add</button></form>
+        </div>
+        <div>
+          <div class="row" style="margin-bottom:8px"><b class="grow mono" id="folderTitle"></b><button class="btn" id="renameFolderBtn">Rename</button><button class="btn danger" id="deleteFolderBtn">Delete folder</button></div>
+          <label id="dropZone" class="dropzone">
+            <input type="file" id="fileInput" multiple hidden accept=".pdf,.md,.markdown,.txt,.rst,.yaml,.yml,.json,.toml,.ini,.csv,.c,.h,.cpp,.hpp,.cc,.py,.js,.ts,.tsx,.go,.rs,.java,.swift,.sh">
+            <b>Drop files here</b> or click to choose · PDF, Markdown, text, code · max 100 MB each
+          </label>
+          <div id="uploadOut"></div>
+          <table id="fileTable" style="margin-top:8px"><thead><tr><th>File</th><th>Size</th><th>Chunks</th><th class="hide-sm">Added</th><th></th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
     </div>
     <div class="card"><h3 style="margin-top:0">Lessons written by agents</h3><div id="lessons"></div></div>
   </section>
@@ -262,7 +283,9 @@ loaders.kb = async () => {
   $("#kbStatus").innerHTML = `<div class="grow"><b>${s.files}</b> files · <b>${s.chunks}</b> chunks · <span class="mono">${esc((s.model || "no index yet").split("/").pop())}</span><br>
     Apple model: ${s.apple_model.available ? `<span class="ok">available</span>` : `<span class="warn">${esc(s.apple_model.reason)}</span>`} ${job}</div>
     <button class="btn primary" id="reindexBtn">Reindex now</button>`;
-  $("#reindexBtn").onclick = async () => { await api("/api/kb/reindex", { method: "POST" }); toast("Reindex started"); pollReindex(); };
+  $("#reindexBtn").onclick = async () => { await api("/api/kb/reindex", { method: "POST" }); toast("Reindex started"); watchIndex(); };
+  loadLibrary();
+  if (s.reindex?.state === "running") watchIndex();
   const ls = await api("/api/kb/lessons");
   $("#lessons").innerHTML = ls.length ? ls.map(l => `<details class="hit"><summary><span class="mono">${esc(l.name)}</span> <span class="muted">by ${esc(l.role)}</span></summary><pre>${esc(l.text)}</pre><button class="btn danger" data-del="${esc(l.name)}">Delete</button></details>`).join("") : `<p class="muted">No lessons yet.</p>`;
   document.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
@@ -270,7 +293,87 @@ loaders.kb = async () => {
     await api("/api/kb/lessons/" + b.dataset.del, { method: "DELETE" }); toast("Deleted"); loaders.kb();
   });
 };
-function pollReindex() { setTimeout(async () => { const s = await api("/api/kb/status"); if (s.reindex?.state === "running") pollReindex(); else { loaders.kb(); toast(s.reindex?.state === "error" ? s.reindex.error : "Reindex done", s.reindex?.state === "error"); } }, 2000); }
+// ---- library ----
+let TREE = [], currentFolder = "datasheets";
+const fmtSize = b => b > 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+async function loadLibrary() {
+  TREE = await api("/api/kb/tree");
+  if (!TREE.some(f => f.path === currentFolder)) currentFolder = TREE.find(f => f.path && !f.reserved)?.path ?? "";
+  const total = p => TREE.filter(f => f.path === p || f.path.startsWith(p + "/")).reduce((n, f) => n + f.files.length, 0);
+  $("#folderList").innerHTML = TREE.filter(f => f.path).map(f => {
+    const depth = f.path.split("/").length - 1, name = f.path.split("/").pop();
+    return `<button data-folder="${esc(f.path)}" style="padding-left:${8 + depth * 16}px" aria-current="${f.path === currentFolder}">${f.reserved ? "🔒 " : "📁 "}${esc(name)} <span class="muted">${total(f.path)}</span></button>`;
+  }).join("");
+  $("#folderList").querySelectorAll("button").forEach(b => b.onclick = () => { currentFolder = b.dataset.folder; loadLibrary(); });
+  renderFolder();
+}
+function renderFolder() {
+  const f = TREE.find(x => x.path === currentFolder) || { path: "", files: [], reserved: true };
+  $("#folderTitle").textContent = "knowledge/" + f.path;
+  $("#dropZone").classList.toggle("disabled", f.reserved);
+  $("#renameFolderBtn").disabled = $("#deleteFolderBtn").disabled = f.reserved;
+  const others = TREE.filter(x => x.path && !x.reserved && x.path !== f.path);
+  $("#fileTable tbody").innerHTML = f.files.length ? f.files.map(file => {
+    const rel = (f.path ? f.path + "/" : "") + file.name;
+    return `<tr><td class="mono">${esc(file.name)}${file.supported ? "" : ` <span class="warn">not indexed (type)</span>`}</td>
+      <td>${fmtSize(file.size)}</td><td>${file.chunks || (file.supported ? `<span class="warn">0</span>` : "–")}</td>
+      <td class="hide-sm muted">${new Date(file.mtime * 1000).toLocaleDateString()}</td>
+      <td>${f.reserved ? "" : `<div class="row"><select data-move="${esc(rel)}" aria-label="Move to"><option value="">Move to…</option>${others.map(o => `<option>${esc(o.path)}</option>`).join("")}</select><button class="btn danger" data-delfile="${esc(rel)}">Delete</button></div>`}</td></tr>`;
+  }).join("") : `<tr><td colspan="5" class="muted">No files in this folder.</td></tr>`;
+  document.querySelectorAll("[data-delfile]").forEach(b => b.onclick = async () => {
+    if (!await ask(`Delete ${b.dataset.delfile}? It is removed from disk and from the index.`)) return;
+    try { await api("/api/kb/file/" + b.dataset.delfile, { method: "DELETE" }); toast("Deleted"); watchIndex(); loadLibrary(); } catch (e) { toast(e.message, true); }
+  });
+  document.querySelectorAll("[data-move]").forEach(s => s.onchange = async () => {
+    if (!s.value) return;
+    try { await api("/api/kb/file/move", { method: "POST", body: { path: s.dataset.move, to_folder: s.value } }); toast("Moved to " + s.value); watchIndex(); loadLibrary(); } catch (e) { toast(e.message, true); }
+  });
+}
+async function upload(files, overwrite = false) {
+  if (!files.length) return;
+  const fd = new FormData(); fd.append("folder", currentFolder); fd.append("overwrite", overwrite);
+  for (const f of files) fd.append("files", f);
+  $("#uploadOut").innerHTML = `<p class="muted">Uploading ${files.length} file(s)…</p>`;
+  try {
+    const r = await fetch("/api/kb/upload", { method: "POST", body: fd });
+    const d = await r.json(); if (!r.ok) throw new Error(d.detail || r.statusText);
+    const lines = [...d.saved.map(n => `<span class="ok">✓</span> ${esc(n)}`), ...d.skipped.map(s => `<span class="bad">✗</span> ${esc(s)}`), ...d.warnings.map(w => `<span class="warn">⚠</span> ${esc(w)}`)];
+    $("#uploadOut").innerHTML = `<p class="mono">${lines.join("<br>")}</p>`;
+    if (d.exists.length && await ask(`Already in this folder: ${d.exists.join(", ")}. Replace them?`)) {
+      return upload(files.filter(f => d.exists.includes(f.name.replace(/[^\w.\- ()]+/g, "_"))), true);
+    }
+    if (d.saved.length) watchIndex();
+    loadLibrary();
+  } catch (e) { $("#uploadOut").innerHTML = `<p class="bad">${esc(e.message)}</p>`; }
+}
+function watchIndex() {
+  const tick = async () => {
+    const s = await api("/api/kb/status"), j = s.reindex;
+    $("#indexJob").innerHTML = !j ? "" : j.state === "running" ? `<span class="warn">⟳ ${esc(j.msg || "indexing")}…</span>`
+      : j.state === "error" ? `<span class="bad">index error: ${esc(j.error)}</span>`
+      : `<span class="ok">✓ indexed at ${esc(j.at)}</span> <span class="muted">+${j.stats.added} ~${j.stats.updated} −${j.stats.removed}, ${j.stats.chunks} chunks, ${j.stats.seconds}s</span>`;
+    if (j?.state === "running") setTimeout(tick, 1500); else { loadLibrary(); loaders.kbStatusOnly?.(); }
+  };
+  tick();
+}
+const dz = $("#dropZone");
+$("#fileInput").onchange = e => { upload([...e.target.files]); e.target.value = ""; };
+["dragenter", "dragover"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("over"); }));
+dz.addEventListener("drop", e => upload([...e.dataTransfer.files]));
+$("#newFolderForm").addEventListener("submit", async e => {
+  e.preventDefault(); const p = $("#newFolder").value.trim().replace(/^\/+|\/+$/g, ""); if (!p) return;
+  try { await api("/api/kb/folder", { method: "POST", body: { path: p } }); $("#newFolder").value = ""; currentFolder = p; toast("Folder created"); loadLibrary(); } catch (err) { toast(err.message, true); }
+});
+$("#renameFolderBtn").onclick = async () => {
+  const to = prompt("New folder path (relative to knowledge/):", currentFolder); if (!to || to === currentFolder) return;
+  try { await api("/api/kb/folder/rename", { method: "POST", body: { path: currentFolder, to } }); currentFolder = to; toast("Renamed - re-indexing"); watchIndex(); loadLibrary(); } catch (e) { toast(e.message, true); }
+};
+$("#deleteFolderBtn").onclick = async () => {
+  if (!await ask(`Delete the empty folder knowledge/${currentFolder}?`)) return;
+  try { await api("/api/kb/folder/" + currentFolder, { method: "DELETE" }); currentFolder = ""; toast("Folder deleted"); loadLibrary(); } catch (e) { toast(e.message, true); }
+};
+
 $("#kbSearchForm").addEventListener("submit", async e => {
   e.preventDefault(); const q = $("#kbQuery").value.trim(); if (!q) return;
   $("#kbHits").innerHTML = `<p class="muted">Searching…</p>`;

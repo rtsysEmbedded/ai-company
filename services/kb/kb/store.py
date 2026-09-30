@@ -153,6 +153,17 @@ def search(query: str, k: int = 6, path_prefix: Optional[str] = None, kind: Opti
     return pool[:k]
 
 
+def chunk_counts() -> Dict[str, int]:
+    """Number of indexed chunks per file path."""
+    db = _db()
+    if CHUNKS not in db.table_names():
+        return {}
+    counts: Dict[str, int] = {}
+    for r in db.open_table(CHUNKS).search().select(["path"]).limit(10**9).to_list():
+        counts[r["path"]] = counts.get(r["path"], 0) + 1
+    return counts
+
+
 def status() -> dict:
     db = _db()
     if CHUNKS not in db.table_names():

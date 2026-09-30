@@ -6,3 +6,7 @@ __pycache__/
 *.pyc
 .DS_Store
 services/afm-helper/.build/
+
+# Knowledge binaries live on disk only (back up with Time Machine / iCloud)
+knowledge/**/*.pdf
+knowledge/**/*.PDF

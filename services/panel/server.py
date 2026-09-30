@@ -8,6 +8,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import subprocess
 import sys
 import threading
@@ -271,18 +272,8 @@ def kb_search(body: SearchIn):
 
 @app.post("/api/kb/reindex", dependencies=[Depends(auth)])
 def kb_reindex():
-    if (_jobs.get("reindex") or {}).get("state") == "running":
-        return _jobs["reindex"]
-
-    def work():
-        try:
-            stats = kb_store.ingest(enrich=make_enricher(log=lambda *_: None), log=lambda *_: None)
-            _jobs["reindex"] = {"state": "done", "stats": stats, "at": time.strftime("%H:%M:%S")}
-        except Exception as e:
-            _jobs["reindex"] = {"state": "error", "error": str(e)[:300]}
-
-    _jobs["reindex"] = {"state": "running"}
-    threading.Thread(target=work, daemon=True).start()
+    if (_jobs.get("reindex") or {}).get("state") != "running":
+        _index_in_background("full reindex")
     return _jobs["reindex"]
 
 
@@ -305,6 +296,180 @@ def delete_lesson(name: str):
         raise HTTPException(400, "invalid name")
     os.remove(os.path.join(LESSONS, name))
     kb_store.ingest(LESSONS, log=lambda *_: None)
+    return {"ok": True}
+
+
+# ---------- library (folders + uploads) ----------
+from fastapi import File, Form, UploadFile  # noqa: E402
+
+from kb.chunk import supported as kb_supported  # noqa: E402
+from kb.config import KNOWLEDGE  # noqa: E402
+
+MAX_UPLOAD = 100 * 1024 * 1024
+FOLDER_RE = r"[\w\- ]+(/[\w\- ]+)*"
+_index_lock = threading.Lock()
+
+
+def _kb_path(rel: str) -> str:
+    """Resolve a path relative to knowledge/, refusing anything outside it, hidden, or in lessons/."""
+    rel = (rel or "").strip().strip("/")
+    base = os.path.realpath(KNOWLEDGE)
+    full = os.path.realpath(os.path.join(base, rel))
+    if full != base and not full.startswith(base + os.sep):
+        raise HTTPException(400, "path outside knowledge/")
+    parts = [] if full == base else os.path.relpath(full, base).split(os.sep)
+    if parts and parts[0] == "lessons":
+        raise HTTPException(400, "lessons/ is reserved for agents")
+    if any(p.startswith(".") for p in parts):
+        raise HTTPException(400, "hidden paths are not allowed")
+    return full
+
+
+def _clean_name(name: str) -> str:
+    name = re.sub(r"[^\w.\- ()]+", "_", os.path.basename(name or "").strip()).strip(". ")
+    if not name:
+        raise HTTPException(400, "invalid file name")
+    return name[:160]
+
+
+def _index_in_background(label: str):
+    """Incrementally index knowledge/ (only new, changed or removed files are touched)."""
+    def work():
+        with _index_lock:
+            _jobs["reindex"] = {"state": "running", "msg": label}
+            try:
+                stats = kb_store.ingest(enrich=make_enricher(log=lambda *_: None), log=lambda *_: None)
+                _jobs["reindex"] = {"state": "done", "stats": stats, "at": time.strftime("%H:%M:%S"), "msg": label}
+            except Exception as e:
+                _jobs["reindex"] = {"state": "error", "error": str(e)[:300], "msg": label}
+    _jobs["reindex"] = {"state": "running", "msg": label}
+    threading.Thread(target=work, daemon=True).start()
+
+
+def _pdf_has_text(path: str) -> bool:
+    import pymupdf
+    with pymupdf.open(path) as doc:
+        return any(page.get_text().strip() for page in doc)
+
+
+@app.get("/api/kb/tree", dependencies=[Depends(auth)])
+def kb_tree():
+    counts = kb_store.chunk_counts()
+    folders = []
+    for d, dirs, files in os.walk(KNOWLEDGE):
+        dirs[:] = sorted(x for x in dirs if not x.startswith("."))
+        rel = os.path.relpath(d, KNOWLEDGE)
+        rel = "" if rel == "." else rel
+        items = []
+        for f in sorted(files):
+            if f.startswith(".") or f.endswith(".part"):
+                continue
+            p = os.path.join(d, f)
+            items.append({"name": f, "size": os.path.getsize(p), "mtime": os.path.getmtime(p),
+                          "chunks": counts.get(os.path.relpath(p, ROOT), 0), "supported": kb_supported(p)})
+        folders.append({"path": rel, "files": items, "reserved": rel.split("/")[0] == "lessons"})
+    return folders
+
+
+class FolderIn(BaseModel):
+    path: str
+
+
+@app.post("/api/kb/folder", dependencies=[Depends(auth)])
+def kb_new_folder(body: FolderIn):
+    if not re.fullmatch(FOLDER_RE, body.path.strip().strip("/")):
+        raise HTTPException(400, "use letters, digits, - _ and / only")
+    os.makedirs(_kb_path(body.path), exist_ok=True)
+    return {"ok": True}
+
+
+class RenameIn(BaseModel):
+    path: str
+    to: str
+
+
+@app.post("/api/kb/folder/rename", dependencies=[Depends(auth)])
+def kb_rename_folder(body: RenameIn):
+    if not re.fullmatch(FOLDER_RE, body.to.strip().strip("/")):
+        raise HTTPException(400, "use letters, digits, - _ and / only")
+    src, dst = _kb_path(body.path), _kb_path(body.to)
+    if src == os.path.realpath(KNOWLEDGE) or not os.path.isdir(src):
+        raise HTTPException(400, "not a folder")
+    if os.path.exists(dst):
+        raise HTTPException(400, "target exists")
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    os.rename(src, dst)
+    _index_in_background(f"renamed {body.path} → {body.to}")
+    return {"ok": True}
+
+
+@app.delete("/api/kb/folder/{rel:path}", dependencies=[Depends(auth)])
+def kb_delete_folder(rel: str):
+    full = _kb_path(rel)
+    if full == os.path.realpath(KNOWLEDGE):
+        raise HTTPException(400, "cannot delete the root")
+    if any(not f.startswith(".") for _, _, fs in os.walk(full) for f in fs):
+        raise HTTPException(400, "folder is not empty - move or delete its files first")
+    shutil.rmtree(full)
+    return {"ok": True}
+
+
+@app.post("/api/kb/upload", dependencies=[Depends(auth)])
+async def kb_upload(folder: str = Form(""), overwrite: bool = Form(False), files: list[UploadFile] = File(...)):
+    target = _kb_path(folder)
+    if not os.path.isdir(target):
+        raise HTTPException(400, "folder does not exist")
+    saved, skipped, exists, warnings = [], [], [], []
+    for up in files:
+        name = _clean_name(up.filename)
+        dest = os.path.join(target, name)
+        if not kb_supported(dest):
+            skipped.append(f"{name}: unsupported file type"); continue
+        if os.path.exists(dest) and not overwrite:
+            exists.append(name); continue
+        tmp, size = dest + ".part", 0
+        with open(tmp, "wb") as out:
+            while chunk := await up.read(1 << 20):
+                size += len(chunk)
+                if size > MAX_UPLOAD:
+                    break
+                out.write(chunk)
+        if size > MAX_UPLOAD:
+            os.remove(tmp); skipped.append(f"{name}: larger than 100 MB"); continue
+        os.replace(tmp, dest)
+        saved.append(name)
+        if name.lower().endswith(".pdf") and not _pdf_has_text(dest):
+            warnings.append(f"{name}: no text found (scanned PDF?) - needs OCR to be searchable")
+    if saved:
+        _index_in_background(f"indexing {len(saved)} uploaded file(s)")
+    return {"saved": saved, "skipped": skipped, "exists": exists, "warnings": warnings}
+
+
+class MoveIn(BaseModel):
+    path: str
+    to_folder: str
+
+
+@app.post("/api/kb/file/move", dependencies=[Depends(auth)])
+def kb_move_file(body: MoveIn):
+    src, dst_dir = _kb_path(body.path), _kb_path(body.to_folder)
+    if not os.path.isfile(src) or not os.path.isdir(dst_dir):
+        raise HTTPException(400, "bad source or target")
+    dst = os.path.join(dst_dir, os.path.basename(src))
+    if os.path.exists(dst):
+        raise HTTPException(400, "a file with that name exists in the target folder")
+    os.rename(src, dst)
+    _index_in_background(f"moved {os.path.basename(src)}")
+    return {"ok": True}
+
+
+@app.delete("/api/kb/file/{rel:path}", dependencies=[Depends(auth)])
+def kb_delete_file(rel: str):
+    full = _kb_path(rel)
+    if not os.path.isfile(full):
+        raise HTTPException(404, "not found")
+    os.remove(full)
+    _index_in_background(f"removed {os.path.basename(full)}")
     return {"ok": True}
 
 
