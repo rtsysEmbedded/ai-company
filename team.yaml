@@ -57,3 +57,18 @@ roles:
     effort: high
     key_env: OPENROUTER_KEY_ARCHITECT
     description: Escalation only - hard architecture decisions or tasks other agents failed twice. Most expensive.
+
+# How the manager distributes work (Phase 7). Applied by scripts/apply_team.py; editable in the panel.
+routing:
+  review: code                 # code = every code-changing task goes to the reviewer | all | off
+  reviewer: reviewer
+  security_review: sensitive   # sensitive = auth, input handling, crypto, dependencies | always | off
+  security_profile: security
+  escalate_after: 2            # failed runs or rejected reviews before escalation
+  escalate_to: architect
+  default_assignee: backend    # used when no profile clearly fits
+  max_parallel: 3              # agents running at the same time (whole machine)
+  max_per_profile: 1           # agents per role at the same time
+  dispatch_interval_seconds: 20
+  task_timeout: 45m            # a single task is stopped after this long
+  planner_model: deepseek/deepseek-v4-flash   # cheap model for splitting work into tasks

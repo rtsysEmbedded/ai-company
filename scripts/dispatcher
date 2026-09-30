@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Kanban dispatcher for the AI company: picks up ready tasks and runs each with its assigned profile.
+# Settings come from team.yaml routing (applied to the manager profile by apply_team.py).
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+read -r INTERVAL LIMIT <<<"$(uv run --project "$ROOT" -q python -c "
+import yaml; r=(yaml.safe_load(open('$ROOT/team.yaml')) or {}).get('routing') or {}
+print(r.get('dispatch_interval_seconds',20), r.get('escalate_after',2))")"
+exec hermes kanban daemon --interval "$INTERVAL" --failure-limit "$LIMIT" --verbose --force  # gateway dispatch is disabled in config, so no race

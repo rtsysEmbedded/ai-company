@@ -473,6 +473,77 @@ def kb_delete_file(rel: str):
     return {"ok": True}
 
 
+# ---------- routing + board ----------
+ROUTING_FIELDS = {
+    "review": ("choice", ["code", "all", "off"]),
+    "security_review": ("choice", ["sensitive", "always", "off"]),
+    "escalate_after": ("int", (1, 10)),
+    "escalate_to": ("role", None),
+    "reviewer": ("role", None),
+    "security_profile": ("role", None),
+    "default_assignee": ("role", None),
+    "max_parallel": ("int", (1, 9)),
+    "max_per_profile": ("int", (1, 5)),
+    "dispatch_interval_seconds": ("int", (5, 600)),
+    "task_timeout": ("duration", None),
+    "planner_model": ("model", None),
+}
+
+
+@app.get("/api/routing", dependencies=[Depends(auth)])
+def get_routing():
+    team = yaml.safe_load(open(TEAM))
+    return {"routing": team.get("routing") or {}, "roles": list(team["roles"])}
+
+
+@app.put("/api/routing", dependencies=[Depends(auth)])
+def put_routing(body: dict):
+    from ruamel.yaml import YAML
+    ry = YAML(); ry.preserve_quotes = True; ry.width = 4096
+    doc = ry.load(open(TEAM))
+    roles = set(doc["roles"])
+    for key, value in body.items():
+        if key not in ROUTING_FIELDS:
+            raise HTTPException(400, f"unknown routing field: {key}")
+        kind, arg = ROUTING_FIELDS[key]
+        if kind == "choice" and value not in arg:
+            raise HTTPException(400, f"{key} must be one of {arg}")
+        if kind == "int":
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                raise HTTPException(400, f"{key} must be a number")
+            if not arg[0] <= value <= arg[1]:
+                raise HTTPException(400, f"{key} must be between {arg[0]} and {arg[1]}")
+        if kind == "role" and value not in roles:
+            raise HTTPException(400, f"{key}: unknown role {value}")
+        if kind == "duration" and not re.fullmatch(r"\d+[smhd]?", str(value)):
+            raise HTTPException(400, f"{key}: use e.g. 45m, 2h or 900")
+        if kind == "model" and value not in {m["id"] for m in models()}:
+            raise HTTPException(400, f"unknown OpenRouter model: {value}")
+        doc["routing"][key] = value
+    with open(TEAM, "w") as f:
+        ry.dump(doc, f)
+    return {"ok": True}
+
+
+@app.get("/api/board", dependencies=[Depends(auth)])
+def board():
+    r = subprocess.run(["hermes", "kanban", "list", "--json", "--sort", "updated"], capture_output=True, text=True)
+    try:
+        tasks = json.loads(r.stdout or "[]")
+    except json.JSONDecodeError:
+        tasks = []
+    svc = {}
+    for name in ("dispatcher", "escalator"):
+        out = subprocess.run(["launchctl", "print", f"gui/{os.getuid()}/com.aicompany.{name}"],
+                             capture_output=True, text=True).stdout
+        m = re.search(r"^\s*state = (.+)$", out, re.M)
+        svc[name] = m.group(1) if m else "not installed"
+    keep = ("id", "title", "assignee", "status", "priority", "created_at", "completed_at")
+    return {"services": svc, "tasks": [{k: t.get(k) for k in keep} for t in tasks][:100]}
+
+
 # ---------- services ----------
 @app.get("/api/services", dependencies=[Depends(auth)])
 def services():

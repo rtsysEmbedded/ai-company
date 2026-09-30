@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.aicompany.escalator</string>
+  <key>ProgramArguments</key>
+  <array><string>__UV__</string><string>run</string><string>--project</string><string>__ROOT__</string><string>python</string><string>__ROOT__/scripts/escalate.py</string></array>
+  <key>WorkingDirectory</key><string>__ROOT__</string>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>__PATH__</string></dict>
+  <key>StartInterval</key><integer>60</integer>
+  <key>StandardOutPath</key><string>__ROOT__/data/logs/escalator.log</string>
+  <key>StandardErrorPath</key><string>__ROOT__/data/logs/escalator.log</string>
+</dict>
+</plist>

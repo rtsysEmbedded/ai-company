@@ -68,6 +68,7 @@
   <h1>AI Company</h1>
   <nav role="tablist">
     <button role="tab" data-tab="team" aria-selected="true">Team</button>
+    <button role="tab" data-tab="routing">Routing</button>
     <button role="tab" data-tab="policies">Policies</button>
     <button role="tab" data-tab="keys">Keys &amp; budget</button>
     <button role="tab" data-tab="kb">Knowledge</button>
@@ -85,6 +86,32 @@
       <tbody></tbody>
     </table></div>
     <datalist id="modelList"></datalist>
+  </section>
+
+  <section id="tab-routing" hidden>
+    <h2>Routing</h2>
+    <p class="lead">How the manager hands out work. Saved to <span class="mono">team.yaml</span>; press <b>Apply</b> afterwards.</p>
+    <form class="card" id="routingForm">
+      <table>
+        <tr><th>Code review</th><td><select name="review"><option value="code">every code change</option><option value="all">every task</option><option value="off">off</option></select></td><td class="muted">Reviewer checks work before it is done</td></tr>
+        <tr><th>Reviewer</th><td><select name="reviewer" data-roles></select></td><td></td></tr>
+        <tr><th>Security review</th><td><select name="security_review"><option value="sensitive">sensitive code only</option><option value="always">every change</option><option value="off">off</option></select></td><td class="muted">Sensitive = auth, untrusted input, crypto, network endpoints, dependencies</td></tr>
+        <tr><th>Security reviewer</th><td><select name="security_profile" data-roles></select></td><td></td></tr>
+        <tr><th>Escalate after</th><td><input name="escalate_after" type="number" min="1" max="10"></td><td class="muted">failed runs or rejected reviews</td></tr>
+        <tr><th>Escalate to</th><td><select name="escalate_to" data-roles></select></td><td></td></tr>
+        <tr><th>Default assignee</th><td><select name="default_assignee" data-roles></select></td><td class="muted">when no role clearly fits</td></tr>
+        <tr><th>Max agents at once</th><td><input name="max_parallel" type="number" min="1" max="9"></td><td class="muted">whole machine</td></tr>
+        <tr><th>Max per role</th><td><input name="max_per_profile" type="number" min="1" max="5"></td><td></td></tr>
+        <tr><th>Check interval (s)</th><td><input name="dispatch_interval_seconds" type="number" min="5" max="600"></td><td class="muted">how often the dispatcher looks for ready tasks</td></tr>
+        <tr><th>Task timeout</th><td><input name="task_timeout" placeholder="45m"></td><td class="muted">e.g. 30m, 2h</td></tr>
+        <tr><th>Planner model</th><td><input name="planner_model" list="modelList"></td><td class="muted">cheap model that splits work into tasks</td></tr>
+      </table>
+      <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn primary">Save routing</button></div>
+    </form>
+    <div class="card">
+      <div class="row"><b class="grow">Task board</b><span id="svcState" class="muted"></span><button class="btn" id="boardRefresh" type="button">Refresh</button></div>
+      <table id="boardTable" style="margin-top:8px"><thead><tr><th>Task</th><th>Assignee</th><th>Status</th><th class="hide-sm">Created</th></tr></thead><tbody></tbody></table>
+    </div>
   </section>
 
   <section id="tab-policies" hidden>
@@ -227,6 +254,27 @@ loaders.team = async () => {
     });
   });
 };
+
+// ---- routing ----
+loaders.routing = async () => {
+  const { routing, roles } = await api("/api/routing");
+  if (!$("#modelList").options.length) api("/api/models").then(ms => $("#modelList").innerHTML = ms.map(m => `<option value="${esc(m.id)}">$${m.in} / $${m.out}</option>`).join("")).catch(() => {});
+  document.querySelectorAll("#routingForm [data-roles]").forEach(s => s.innerHTML = roles.map(r => `<option>${esc(r)}</option>`).join(""));
+  for (const [k, v] of Object.entries(routing)) { const el = $(`#routingForm [name=${k}]`); if (el) el.value = v; }
+  loadBoard();
+};
+$("#routingForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(e.target));
+  try { await api("/api/routing", { method: "PUT", body }); toast("Routing saved - go to Apply"); refreshPending(); } catch (err) { toast(err.message, true); }
+});
+const STATUS_CLASS = { done: "ok", running: "warn", review: "warn", blocked: "bad" };
+async function loadBoard() {
+  const b = await api("/api/board");
+  $("#svcState").innerHTML = Object.entries(b.services).map(([k, v]) => `${esc(k)}: <span class="${v === "running" || v === "not running" && k === "escalator" ? "ok" : "bad"}">${esc(v === "not running" && k === "escalator" ? "idle (runs every 60s)" : v)}</span>`).join(" · ");
+  $("#boardTable tbody").innerHTML = b.tasks.length ? b.tasks.map(t => `<tr><td><span class="mono muted">${esc(t.id)}</span> ${esc(t.title)}</td><td>${esc(t.assignee || "–")}</td><td class="${STATUS_CLASS[t.status] || ""}">${esc(t.status)}</td><td class="hide-sm muted">${t.created_at ? new Date(t.created_at * 1000).toLocaleString() : ""}</td></tr>`).join("") : `<tr><td colspan="4" class="muted">No tasks yet. Ask the manager (hermes) for a coding task.</td></tr>`;
+}
+$("#boardRefresh").onclick = loadBoard;
 
 // ---- policies ----
 let currentPolicy = null;
