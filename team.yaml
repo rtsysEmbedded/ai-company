@@ -65,6 +65,14 @@ roles:
     description: Escalation only - hard architecture decisions or tasks other agents failed twice. Most expensive.
 
 # How the manager distributes work (Phase 7). Applied by scripts/apply_team.py; editable in the panel.
+  # General mode: talk to it directly (`general` in the terminal, or chat in the panel). It shares the manager's key.
+  general:
+    model: deepseek/deepseek-v4-pro-0813
+    fallback: openai/gpt-5.6-luna-pro
+    effort: medium
+    key_env: OPENROUTER_KEY_MANAGER
+    routable: false
+    description: General assistant - answers questions and does any task itself, start to finish. Not part of the manager's task routing.
 routing:
   review: code                 # code = every code-changing task goes to the reviewer | all | off
   reviewer: reviewer
