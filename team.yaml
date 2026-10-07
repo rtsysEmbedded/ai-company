@@ -34,7 +34,7 @@ roles:
     key_env: OPENROUTER_KEY_SECURITY
     description: Security analysis - audits for vulnerabilities, secrets, auth flaws and risky dependencies. Read-only unless told to fix.
   reviewer:
-    model: openai/gpt-5.6-terra               # 2.00 / 12.00
+    model: deepseek/deepseek-v4-pro-0813      # 2.00 / 12.00
     fallback: anthropic/claude-sonnet-5.5
     effort: high
     key_env: OPENROUTER_KEY_REVIEWER
@@ -58,7 +58,7 @@ roles:
     key_env: OPENROUTER_KEY_HARDWARE
     description: Hardware group - firmware and embedded C/C++, drivers, RTOS, board bring-up, datasheets, secure boot and updates.
   architect:
-    model: anthropic/claude-opus-5.5          # 4.00 / 20.00
+    model: deepseek/deepseek-v4-pro-0813      # 4.00 / 20.00
     fallback: openai/gpt-5.6-sol
     effort: high
     key_env: OPENROUTER_KEY_ARCHITECT
