@@ -30,7 +30,7 @@ from kb.enrich import afm_status, make_enricher  # noqa: E402
 TEAM = os.path.join(ROOT, "team.yaml")
 POLICIES = os.path.join(ROOT, "policies")
 ENV = os.path.join(ROOT, ".env")
-TOKEN_FILE = os.path.join(ROOT, "data", "panel_token")
+TOKEN_FILE = os.environ.get("PANEL_TOKEN_FILE") or os.path.join(ROOT, "data", "panel_token")
 PORT = int(os.environ.get("PANEL_PORT", "8770"))
 UV = os.environ.get("UV_BIN", "uv")
 # Typical Hermes call: system prompt + tool schemas + a short answer.
@@ -72,7 +72,42 @@ def login(token: str):
 def index(request: Request):
     if request.cookies.get("panel_token") != TOKEN:
         raise HTTPException(401, "Open the panel with: scripts/panel-open")
-    return FileResponse(os.path.join(os.path.dirname(__file__), "index.html"))
+    # no-cache: the browser re-checks the page, so a panel update shows up on the next reload
+    return FileResponse(os.path.join(os.path.dirname(__file__), "index.html"), headers={"Cache-Control": "no-cache"})
+
+
+# ---------- departments (everything under departments/, run by the department engine) ----------
+sys.path.insert(0, os.path.dirname(__file__))
+import dept_api  # noqa: E402
+import software_api  # noqa: E402
+
+
+
+def _software_apply(message: str):
+    """Commit team.yaml and the policies, then run apply_team.py. Returns (ok, log)."""
+    git("add", "team.yaml", "policies")
+    if git("diff", "--cached", "--quiet").returncode != 0:
+        msg = "panel: " + (message.strip() or "update team/policies")
+        git("-c", "user.name=AI Company Panel", "-c", "user.email=panel@localhost", "commit", "-qm", msg)
+    cmd = [UV, "run", "--project", ROOT, "-q", "python", os.path.join(ROOT, "scripts", "apply_team.py")]
+    r = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT)
+    return r.returncode == 0, (r.stdout + r.stderr).strip() + "\n\nSaved as: " + git("log", "--oneline", "-1").stdout.strip()
+
+
+app.include_router(software_api.build_router(auth, _software_apply))   # first: /api/departments/software is not an engine department
+app.include_router(dept_api.build_router(auth))
+
+import activity_api  # noqa: E402
+
+app.include_router(activity_api.build_router(auth))
+
+import agent_api  # noqa: E402
+
+app.include_router(agent_api.build_router(auth))
+
+import backup_api  # noqa: E402
+
+app.include_router(backup_api.build_router(auth))
 
 
 # ---------- helpers ----------

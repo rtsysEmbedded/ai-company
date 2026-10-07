@@ -3,329 +3,1459 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>AI Company Panel</title>
+<link rel="icon" href="data:,">
 <style>
   :root {
     color-scheme: light dark;
-    --bg: #f6f6f4; --surface: #ffffff; --text: #1b1b1a; --muted: #6b6b66; --line: #e2e1dc;
-    --accent: #2f6fdd; --accent-soft: #e6eefc; --good: #1f8a4c; --warn: #b7791f; --bad: #c43b3b;
+    --bg: #f5f5f2; --surface: #ffffff; --raised: #fafaf8; --text: #1b1b1a; --muted: #66665f; --line: #e2e1dc;
+    --accent: #2f5fd0; --accent-soft: #e6ecfb; --on-accent: #ffffff;
+    --good: #1a7f45; --warn: #a66a12; --bad: #c0392b;
     --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --radius: 10px; --side: 232px; --gap: 16px;
+    --shadow: 0 1px 2px rgb(0 0 0 / .05), 0 4px 16px rgb(0 0 0 / .04);
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #161615; --surface: #1f1f1d; --text: #ecebe6; --muted: #9c9b94; --line: #33322f;
-            --accent: #7aa7ff; --accent-soft: #22304a; --good: #4cc27f; --warn: #e3a948; --bad: #ef6b6b; }
+    :root { --bg: #131312; --surface: #1c1c1a; --raised: #232321; --text: #ecebe6; --muted: #a09f97; --line: #32312e;
+            --accent: #8fb0ff; --accent-soft: #212c45; --on-accent: #0e1730;
+            --good: #56c98a; --warn: #e6ad4f; --bad: #f0766c; --shadow: none; }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
-  header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--surface); position: sticky; top: 0; z-index: 2; }
-  header h1 { font-size: 16px; margin: 0; }
-  nav { display: flex; gap: 4px; flex-wrap: wrap; }
-  nav button { border: 0; background: none; color: var(--muted); padding: 6px 12px; border-radius: 8px; font: inherit; cursor: pointer; }
-  nav button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-  .badge { display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 9px; background: var(--warn); color: #fff; font-size: 11px; margin-left: 4px; }
+  html { accent-color: var(--accent); }
+  body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text);
+         display: grid; grid-template-columns: var(--side) minmax(0, 1fr); min-height: 100vh; }
   [hidden] { display: none !important; }
-  main { max-width: 1200px; margin: 0 auto; padding: 24px; }
-  section[hidden] { display: none; }
-  h2 { font-size: 18px; margin: 0 0 4px; }
-  p.lead { color: var(--muted); margin: 0 0 16px; }
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--accent); }
+  h1, h2, h3 { margin: 0; text-wrap: balance; }
+  h2 { font-size: 15px; }
+  h3 { font-size: 14px; }
+
+  /* ---- sidebar ---- */
+  #side { background: var(--surface); border-right: 1px solid var(--line); padding: 16px 12px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+          display: flex; flex-direction: column; gap: 4px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 14px; font-weight: 650; font-size: 15px; }
+  .brand i { width: 26px; height: 26px; border-radius: 7px; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-style: normal; font-size: 13px; }
+  .group { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 14px 8px 4px; }
+  #side a.item, #side button.item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border-radius: 7px; border: 0; background: none;
+          color: var(--text); font: inherit; text-decoration: none; text-align: left; cursor: pointer; }
+  #side .item:hover { background: var(--raised); }
+  #side .item[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  #side .item .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #side .item.add { color: var(--muted); }
+  #envBox { margin-top: auto; padding: 12px 8px 0; border-top: 1px solid var(--line); font-size: 12.5px; display: grid; gap: 4px; }
+  #envBox .env { display: grid; grid-template-columns: 8px 1fr; gap: 8px; align-items: baseline; color: var(--muted); }
+
+  /* ---- page ---- */
+  #page { min-width: 0; }
+  #pagehead { background: var(--surface); border-bottom: 1px solid var(--line); padding: 16px 28px 0; position: sticky; top: 0; z-index: 2; }
+  #pagehead .top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-bottom: 12px; }
+  #pageTitle { font-size: 19px; }
+  #pageSub { color: var(--muted); }
+  #tabs { display: flex; gap: 2px; flex-wrap: wrap; margin-bottom: -1px; }
+  #tabs a { padding: 8px 12px; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; }
+  #tabs a:hover { color: var(--text); }
+  #tabs a[aria-selected="true"] { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+  main { max-width: 1180px; padding: 24px 28px 96px; }
+  p.lead { color: var(--muted); margin: 0 0 16px; max-width: 75ch; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: var(--gap); box-shadow: var(--shadow); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--gap); margin-bottom: var(--gap); }
+  .cards .card { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+  .cards a.card { color: inherit; text-decoration: none; }
+  .cards a.card:hover, .cards button.card:hover { border-color: var(--accent); }
+  .cards button.card { font: inherit; color: var(--muted); cursor: pointer; align-items: center; justify-content: center; border-style: dashed; min-height: 120px; }
+  .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; }
   th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child > td { border-bottom: 0; }
   th { font-size: 12px; color: var(--muted); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   input, select, textarea { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; }
-  textarea { font-family: var(--mono); font-size: 13px; min-height: 360px; resize: vertical; }
-  button.btn { font: inherit; border: 1px solid var(--line); background: var(--surface); color: var(--text); padding: 6px 14px; border-radius: 8px; cursor: pointer; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  input[type=checkbox], input[type=radio] { width: auto; }
+  textarea { resize: vertical; min-height: 64px; }
+  textarea.code { font-family: var(--mono); font-size: 13px; min-height: 380px; }
+  button.btn, a.btn { font: inherit; border: 1px solid var(--line); background: var(--surface); color: var(--text); padding: 6px 14px; border-radius: 8px; cursor: pointer; text-decoration: none; white-space: nowrap; }
+  button.btn:hover { border-color: var(--muted); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
   button.danger { color: var(--bad); }
   button:disabled { opacity: .5; cursor: default; }
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .grow { flex: 1; }
+  .end { justify-content: flex-end; }
+  .grow { flex: 1; min-width: 0; }
   .muted { color: var(--muted); }
   .mono { font-family: var(--mono); font-size: 12.5px; }
   .ok { color: var(--good); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+  .chip { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 1px 9px; font-size: 12px; white-space: nowrap;
+          color: var(--c, var(--muted)); background: color-mix(in srgb, var(--c, var(--muted)) 13%, transparent); }
+  .chip.ok { --c: var(--good); } .chip.warn { --c: var(--warn); } .chip.bad { --c: var(--bad); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--muted)); flex: none; }
+  .dot.ok { --c: var(--good); } .dot.warn { --c: var(--warn); } .dot.bad { --c: var(--bad); }
+  .badge { display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 9px; background: var(--warn); color: #fff; font-size: 11px; text-align: center; }
   .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; min-width: 120px; }
   .bar > i { display: block; height: 100%; background: var(--good); }
   .bar > i.hi { background: var(--warn); } .bar > i.full { background: var(--bad); }
-  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; max-height: 420px; font-size: 12.5px; }
-  .split { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
+  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; max-height: 420px; font-size: 12.5px; margin: 8px 0 0; white-space: pre-wrap; }
+  .split { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--gap); }
   .list button { display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--text); padding: 6px 8px; border-radius: 6px; cursor: pointer; font: inherit; }
   .list button[aria-current="true"] { background: var(--accent-soft); color: var(--accent); }
+  .list .group { padding: 10px 8px 2px; }
   .hit { border-bottom: 1px solid var(--line); padding: 10px 0; }
   .hit:last-child { border: 0; }
-  dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); max-width: 560px; width: 90vw; }
+  .notice { border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); background: color-mix(in srgb, var(--c) 9%, transparent); color: var(--text);
+            border-radius: 8px; padding: 10px 12px; margin-bottom: var(--gap); white-space: pre-wrap; }
+  .notice.warn { --c: var(--warn); } .notice.bad { --c: var(--bad); }
+  dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); max-width: 560px; width: 90vw; padding: 20px; }
   dialog::backdrop { background: rgb(0 0 0 / .4); }
-  #toast { position: fixed; bottom: 20px; right: 20px; background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  dialog label, .field > label { display: block; font-weight: 600; margin: 12px 0 4px; }
+  .help { font-size: 12.5px; color: var(--muted); margin: 4px 0 0; }
+  #toast { position: fixed; bottom: 20px; right: 20px; background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 9; max-width: 60ch; }
   #toast.show { opacity: 1; }
-  .dropzone { display: block; border: 2px dashed var(--line); border-radius: 10px; padding: 20px; text-align: center; color: var(--muted); cursor: pointer; }
+  .dropzone { display: block; border: 2px dashed var(--line); border-radius: var(--radius); padding: 20px; text-align: center; color: var(--muted); cursor: pointer; }
   .dropzone.over { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
   .dropzone.disabled { opacity: .5; pointer-events: none; }
   .dirty td:first-child { box-shadow: inset 3px 0 var(--warn); }
-  @media (max-width: 760px) { .split { grid-template-columns: 1fr; } main { padding: 16px; } .hide-sm { display: none; } }
+
+  /* ---- department roles ---- */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--gap); margin-bottom: var(--gap); }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+  .stat b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; } .stat span { color: var(--muted); font-size: 12px; }
+  .split.halves { grid-template-columns: 1fr 1fr; } @media (max-width: 1100px) { .split.halves { grid-template-columns: 1fr; } }
+  [data-view="activity"] .card { overflow-x: auto; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pulse { animation: pulse 1.6s ease-in-out infinite; } @keyframes pulse { 50% { opacity: .35; } }
+  details.task { border-bottom: 1px solid var(--line); } details.task:last-child { border: 0; }
+  details.task > summary { display: flex; gap: 10px; align-items: center; padding: 9px 4px; cursor: pointer; list-style: none; flex-wrap: wrap; }
+  details.task > summary::-webkit-details-marker { display: none; }
+  details.task .body { padding: 4px 4px 14px; }
+  .flow { display: inline-flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { border: 0; background: none; color: var(--muted); padding: 4px 10px; font: inherit; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .banner { border: 1px solid var(--c); border-left-width: 5px; background: var(--surface); border-radius: var(--radius); padding: 10px 14px; margin-bottom: var(--gap); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .banner.bad { --c: var(--bad); } .banner.warn { --c: var(--warn); }
+  /* ---- flow ---- */
+  .flow-now { display: grid; gap: 6px; }
+  .flow-now .line { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .flow-scroll { overflow-x: auto; padding: 8px 4px 12px; }
+  .flow-graph { position: relative; width: max-content; min-width: 100%; }
+  .flow-cols { display: flex; gap: 64px; align-items: flex-start; position: relative; }
+  .flow-col { display: flex; flex-direction: column; gap: 14px; width: 236px; flex: none; }
+  .flow-col > .step { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .flow-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+  .flow-lines path { fill: none; stroke: var(--line); stroke-width: 2; stroke-dasharray: 3 5; }
+  .flow-lines path.passed { stroke: var(--good); stroke-dasharray: none; opacity: .55; }
+  .flow-lines path.live { stroke: var(--good); stroke-width: 3; stroke-dasharray: 8 7; animation: march .7s linear infinite; opacity: 1; }
+  .flow-lines path.stuck { stroke: var(--bad); opacity: .6; }
+  @keyframes march { from { stroke-dashoffset: 15; } to { stroke-dashoffset: 0; } }
+  .fcard { display: flex; flex-direction: column; gap: 6px; text-align: left; font: inherit; color: inherit; cursor: pointer; background: var(--surface);
+           border: 1px solid var(--line); border-left: 4px solid var(--c, var(--line)); border-radius: var(--radius); padding: 10px 12px; box-shadow: var(--shadow); }
+  .fcard:hover { border-color: var(--muted); border-left-color: var(--c, var(--muted)); }
+  .fcard.done { --c: var(--good); } .fcard.blocked { --c: var(--bad); } .fcard.review { --c: var(--warn); }
+  .fcard b { font-weight: 600; overflow-wrap: anywhere; }
+  .fcard .foot { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+  .fcard.working { --c: var(--good); border-color: var(--good); animation: fflash 1.2s ease-in-out infinite; }
+  @keyframes fflash { 0%, 100% { background: var(--surface); box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 60%, transparent); }
+                      50% { background: color-mix(in srgb, var(--good) 20%, var(--surface)); box-shadow: 0 0 0 7px color-mix(in srgb, var(--good) 0%, transparent); } }
+  .fcard.changed { animation: fchanged 1.8s ease-out 1; } @keyframes fchanged { from { background: var(--accent-soft); } }
+  .steps { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  .steps .chip.now { --c: var(--good); font-weight: 600; animation: pulse 1.2s ease-in-out infinite; }
+  .steps .chip.next { background: none; border: 1px dashed var(--line); }
+  .steps i { color: var(--muted); font-style: normal; }
+  @media (prefers-reduced-motion: reduce) { .fcard, .flow-lines path, .steps .chip { animation: none !important; } .fcard.working { background: color-mix(in srgb, var(--good) 20%, var(--surface)); } }
+  /* ---- office ---- */
+  #office { position: relative; }
+  .office-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: var(--gap); }
+  .door { display: inline-flex; align-items: center; gap: 8px; border: 2px dashed var(--line); border-radius: 10px; padding: 6px 12px; background: var(--surface); }
+  .tray { display: inline-flex; gap: 4px; align-items: center; min-height: 26px; }
+  .paper { width: 18px; height: 22px; border-radius: 3px; background: #fdfcf7; border: 1px solid #c9c6b8; box-shadow: 0 1px 2px rgb(0 0 0 / .25); position: relative; cursor: pointer; padding: 0; flex: none; }
+  .paper::before { content: ""; position: absolute; left: 3px; right: 3px; top: 5px; height: 2px; background: #b9b5a4; box-shadow: 0 4px #b9b5a4, 0 8px #b9b5a4; }
+  .paper.blocked { border-color: var(--bad); } .paper.blocked::after { content: "!"; position: absolute; top: -8px; right: -6px; background: var(--bad); color: #fff; border-radius: 50%; width: 13px; height: 13px; font: 700 10px/13px sans-serif; text-align: center; }
+  .paper.review { border-color: var(--warn); } .paper.done { opacity: .75; } .paper.done::after { content: "✓"; position: absolute; top: -8px; right: -6px; background: var(--good); color: #fff; border-radius: 50%; width: 13px; height: 13px; font: 700 9px/13px sans-serif; text-align: center; }
+  .paper.fly { position: fixed; z-index: 50; pointer-events: none; width: 22px; height: 27px; }
+  .room { border: 2px solid var(--line); border-radius: 14px; margin-bottom: var(--gap); overflow: hidden; background:
+      linear-gradient(var(--surface), var(--surface)) padding-box; }
+  .room > header { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 2px solid var(--line); background: var(--accent-soft); }
+  .room > header b { font-size: 14px; } .room.busy { border-color: var(--good); }
+  .floor { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 14px;
+    background-image: linear-gradient(45deg, rgb(127 127 127 / .06) 25%, transparent 25%, transparent 75%, rgb(127 127 127 / .06) 75%), linear-gradient(45deg, rgb(127 127 127 / .06) 25%, transparent 25%, transparent 75%, rgb(127 127 127 / .06) 75%);
+    background-size: 32px 32px; background-position: 0 0, 16px 16px; }
+  .desk { position: relative; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; padding: 34px 6px 6px; border-radius: 12px; text-align: center; min-height: 168px; }
+  .desk:hover, .desk:focus-visible { background: rgb(127 127 127 / .12); outline: none; }
+  .desk .who { display: block; font-weight: 600; font-size: 13px; } .desk .model { display: block; font-size: 11px; color: var(--muted); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .desk svg { display: block; margin: 0 auto; overflow: visible; }
+  .desk .stack { display: flex; gap: 3px; justify-content: center; min-height: 24px; margin-top: 4px; flex-wrap: wrap; }
+  .desk.idle svg { opacity: .85; filter: saturate(.7); } .desk.off svg { opacity: .25; filter: grayscale(1); } .desk.off .who { color: var(--muted); }
+  .bubble { position: absolute; top: 2px; left: 50%; transform: translateX(-50%); max-width: 150px; background: var(--surface); border: 1px solid var(--good); border-radius: 10px; padding: 2px 8px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: var(--shadow); }
+  .bubble.bad { border-color: var(--bad); color: var(--bad); } .bubble.warn { border-color: var(--warn); }
+  .desk .screen { fill: #2b3140; } .desk.work .screen { fill: #7fd4ff; animation: glow 1.2s ease-in-out infinite; }
+  .desk.work .arm-l { animation: type .35s ease-in-out infinite alternate; transform-origin: 34px 46px; }
+  .desk.work .arm-r { animation: type .35s ease-in-out infinite alternate-reverse; transform-origin: 56px 46px; }
+  .desk.work .head { animation: nod 2.4s ease-in-out infinite; transform-origin: 45px 30px; }
+  .desk.stuck .screen { fill: #ff8a8a; } .desk.idle .zz { opacity: 1; animation: zz 3s ease-in-out infinite; } .zz { opacity: 0; font-size: 11px; fill: var(--muted); }
+  @keyframes type { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
+  @keyframes glow { 50% { fill: #c9efff; } } @keyframes nod { 50% { transform: rotate(3deg); } }
+  @keyframes zz { 0%, 100% { opacity: 0; transform: translateY(0); } 50% { opacity: .9; transform: translateY(-4px); } }
+  @media (prefers-reduced-motion: reduce) { .desk * { animation: none !important; } }
+  #agentDialog { max-width: 760px; width: 94vw; } #agentDialog table { font-size: 13px; }
+  .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+  .switch input { appearance: none; width: 38px; height: 22px; border-radius: 11px; background: var(--line); position: relative; cursor: pointer; margin: 0; padding: 0; border: 0; flex: none; }
+  .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
+  .switch input:checked { background: var(--good); } .switch input:checked::after { left: 19px; }
+  .switch input:disabled { opacity: .5; cursor: default; }
+  .chatlog { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; height: 320px; overflow-y: auto; background: var(--bg); display: flex; flex-direction: column; gap: 8px; }
+  .msg { max-width: 88%; padding: 7px 11px; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.user { align-self: flex-end; background: var(--accent-soft); } .msg.assistant { align-self: flex-start; background: var(--surface); border: 1px solid var(--line); }
+  .msg.err { border-color: var(--bad); color: var(--bad); } .msg.wait { color: var(--muted); font-style: italic; }
+  .chatform textarea { min-height: 62px; font-family: inherit; font-size: 14px; }
+  .desk.off .bubble { border-color: var(--line); color: var(--muted); }
+  details.role { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); margin-bottom: 8px; }
+  details.role[open] { box-shadow: var(--shadow); }
+  details.role > summary { display: flex; align-items: center; gap: 10px; padding: 11px 14px; cursor: pointer; list-style: none; flex-wrap: wrap; }
+  details.role > summary::-webkit-details-marker { display: none; }
+  details.role > summary::before { content: "›"; color: var(--muted); transition: rotate .15s; width: 8px; }
+  details.role[open] > summary::before { rotate: 90deg; }
+  details.role.off > summary b { color: var(--muted); }
+  .role-body { border-top: 1px solid var(--line); padding: 4px 14px 14px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--gap); }
+  .role-body .wide { grid-column: 1 / -1; }
+  .checks { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .checks label { display: inline-flex; align-items: center; gap: 6px; font-weight: 400; margin: 0; min-height: 28px; }
+  .form-grid { display: grid; grid-template-columns: 220px minmax(0, 420px) minmax(0, 1fr); gap: 10px 16px; align-items: center; }
+  .form-grid > b { font-weight: 600; }
+  #saveBar { position: fixed; left: calc(var(--side) + 28px); right: 28px; bottom: 16px; max-width: 1124px; background: var(--text); color: var(--bg); border-radius: 12px; padding: 10px 14px;
+             display: flex; gap: 8px; align-items: center; z-index: 5; box-shadow: 0 8px 30px rgb(0 0 0 / .25); }
+  #saveBar .btn { border-color: transparent; }
+
+  @media (max-width: 860px) {
+    body { display: block; }
+    #side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; border-right: 0; border-bottom: 1px solid var(--line); padding: 8px 12px; }
+    #side a.item, #side button.item { width: auto; } #deptNav { display: contents; } .brand { padding: 4px 8px; } .group, #envBox { display: none; }
+    #pagehead { position: static; padding: 12px 16px 0; } main { padding: 16px 16px 96px; }
+    .split, .role-body, .form-grid { grid-template-columns: 1fr; } .hide-sm { display: none; }
+    #saveBar { left: 12px; right: 12px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>AI Company</h1>
-  <nav role="tablist">
-    <button role="tab" data-tab="team" aria-selected="true">Team</button>
-    <button role="tab" data-tab="routing">Routing</button>
-    <button role="tab" data-tab="policies">Policies</button>
-    <button role="tab" data-tab="keys">Keys &amp; budget</button>
-    <button role="tab" data-tab="kb">Knowledge</button>
-    <button role="tab" data-tab="services">Services</button>
-    <button role="tab" data-tab="apply">Apply<span id="pendingBadge" class="badge" hidden>!</span></button>
-  </nav>
-</header>
+<aside id="side">
+  <div class="brand"><i>AI</i>AI Company</div>
+  <div class="group">Company</div>
+  <a class="item" href="#/overview" data-nav="overview"><span class="grow">Overview</span></a>
+  <a class="item" href="#/activity" data-nav="activity"><span class="grow">Activity</span><span class="dot ok pulse" data-live hidden></span></a>
+  <a class="item" href="#/flow" data-nav="flow"><span class="grow">Flow</span><span class="dot ok pulse" data-live hidden></span></a>
+  <a class="item" href="#/office" data-nav="office"><span class="grow">Office</span><span class="dot ok pulse" data-live hidden></span></a>
+  <a class="item" href="#/knowledge" data-nav="knowledge"><span class="grow">Knowledge</span></a>
+  <a class="item" href="#/services" data-nav="services"><span class="grow">Services</span></a>
+  <div class="group">Departments</div>
+  <a class="item" href="#/software/team" data-nav="software"><span class="grow">Software</span><span class="badge" data-sw-pending hidden>!</span></a>
+  <div id="deptNav"></div>
+  <button class="item add" id="addDeptNav" type="button">+ Add department</button>
+  <div id="envBox" aria-label="Status of this machine"></div>
+</aside>
 
-<main>
-  <section id="tab-team">
-    <h2>Team</h2>
-    <p class="lead">Model, fallback and reasoning per role. Changes are saved to <span class="mono">team.yaml</span>; go to <b>Apply</b> to push them to Hermes. "≈/call" assumes about 17k input and 500 output tokens.</p>
-    <div class="card"><table id="teamTable">
-      <thead><tr><th>Role</th><th>Model</th><th>Fallback</th><th>Effort</th><th class="hide-sm">Description (used for routing)</th><th></th></tr></thead>
-      <tbody></tbody>
-    </table></div>
-    <datalist id="modelList"></datalist>
-  </section>
+<div id="page">
+  <header id="pagehead">
+    <div class="top"><h1 id="pageTitle">Overview</h1><span id="pageSub"></span><span class="grow"></span><span id="pageChips" class="row"></span></div>
+    <nav id="tabs" role="tablist" hidden></nav>
+  </header>
 
-  <section id="tab-routing" hidden>
-    <h2>Routing</h2>
-    <p class="lead">How the manager hands out work. Saved to <span class="mono">team.yaml</span>; press <b>Apply</b> afterwards.</p>
-    <form class="card" id="routingForm">
-      <table>
-        <tr><th>Code review</th><td><select name="review"><option value="code">every code change</option><option value="all">every task</option><option value="off">off</option></select></td><td class="muted">Reviewer checks work before it is done</td></tr>
-        <tr><th>Reviewer</th><td><select name="reviewer" data-roles></select></td><td></td></tr>
-        <tr><th>Security review</th><td><select name="security_review"><option value="sensitive">sensitive code only</option><option value="always">every change</option><option value="off">off</option></select></td><td class="muted">Sensitive = auth, untrusted input, crypto, network endpoints, dependencies</td></tr>
-        <tr><th>Security reviewer</th><td><select name="security_profile" data-roles></select></td><td></td></tr>
-        <tr><th>Escalate after</th><td><input name="escalate_after" type="number" min="1" max="10"></td><td class="muted">failed runs or rejected reviews</td></tr>
-        <tr><th>Escalate to</th><td><select name="escalate_to" data-roles></select></td><td></td></tr>
-        <tr><th>Default assignee</th><td><select name="default_assignee" data-roles></select></td><td class="muted">when no role clearly fits</td></tr>
-        <tr><th>Max agents at once</th><td><input name="max_parallel" type="number" min="1" max="9"></td><td class="muted">whole machine</td></tr>
-        <tr><th>Max per role</th><td><input name="max_per_profile" type="number" min="1" max="5"></td><td></td></tr>
-        <tr><th>Check interval (s)</th><td><input name="dispatch_interval_seconds" type="number" min="5" max="600"></td><td class="muted">how often the dispatcher looks for ready tasks</td></tr>
-        <tr><th>Task timeout</th><td><input name="task_timeout" placeholder="45m"></td><td class="muted">e.g. 30m, 2h</td></tr>
-        <tr><th>Planner model</th><td><input name="planner_model" list="modelList"></td><td class="muted">cheap model that splits work into tasks</td></tr>
-      </table>
-      <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn primary">Save routing</button></div>
-    </form>
-    <div class="card">
-      <div class="row"><b class="grow">Task board</b><span id="svcState" class="muted"></span><button class="btn" id="boardRefresh" type="button">Refresh</button></div>
-      <table id="boardTable" style="margin-top:8px"><thead><tr><th>Task</th><th>Assignee</th><th>Status</th><th class="hide-sm">Created</th></tr></thead><tbody></tbody></table>
-    </div>
-  </section>
+  <main>
+    <div id="creditBanner" class="banner" role="alert" hidden></div>
+    <!-- ================= company ================= -->
+    <section data-view="overview">
+      <p class="lead">Every department is a team of Hermes agents: one lead you talk to, and specialists it hands tasks to over the task board. Nothing changes in Hermes until you apply.</p>
+      <div class="cards" id="overviewCards"></div>
+      <div class="card"><h2>This machine</h2><div id="overviewEnv" class="row" style="margin-top:10px"></div></div>
+    </section>
 
-  <section id="tab-policies" hidden>
-    <h2>Policies</h2>
-    <p class="lead">Rules injected into every agent's instructions. Keep them short; long rulebooks belong in <span class="mono">knowledge/policies-full/</span>.</p>
-    <div class="split">
-      <div class="card list" id="policyList"></div>
+    <section data-view="knowledge" hidden>
+      <p class="lead">Local knowledge base, shared by all departments: files in <span class="mono">knowledge/</span>, indexed on this Mac.</p>
+      <div class="card row" id="kbStatus"></div>
       <div class="card">
-        <div class="row" style="margin-bottom:8px"><b id="policyName" class="grow mono"></b><span id="policyChars" class="muted"></span><button class="btn primary" id="policySave">Save</button></div>
-        <textarea id="policyText" spellcheck="false"></textarea>
+        <form class="row" id="kbSearchForm"><input class="grow" id="kbQuery" aria-label="Search the knowledge base" placeholder="Test a search, e.g. HAL_UART_Init or 'why FreeRTOS'"><button class="btn primary">Search</button></form>
+        <div id="kbHits"></div>
       </div>
-    </div>
-  </section>
+      <div class="card">
+        <div class="row" style="margin-bottom:12px"><h2 class="grow">Library</h2><span id="indexJob" class="muted"></span></div>
+        <div class="split">
+          <div>
+            <div class="list" id="folderList"></div>
+            <form class="row" id="newFolderForm" style="margin-top:8px"><input class="grow" id="newFolder" aria-label="New folder" placeholder="new folder, e.g. datasheets/stm32"><button class="btn">Add</button></form>
+          </div>
+          <div>
+            <div class="row" style="margin-bottom:8px"><b class="grow mono" id="folderTitle"></b><button class="btn" id="renameFolderBtn">Rename</button><button class="btn danger" id="deleteFolderBtn">Delete folder</button></div>
+            <label id="dropZone" class="dropzone">
+              <input type="file" id="fileInput" multiple hidden accept=".pdf,.md,.markdown,.txt,.rst,.yaml,.yml,.json,.toml,.ini,.csv,.c,.h,.cpp,.hpp,.cc,.py,.js,.ts,.tsx,.go,.rs,.java,.swift,.sh">
+              <b>Drop files here</b> or click to choose · PDF, Markdown, text, code · max 100 MB each
+            </label>
+            <div id="uploadOut"></div>
+            <div class="table-wrap"><table id="fileTable" style="margin-top:8px"><thead><tr><th>File</th><th>Size</th><th>Chunks</th><th class="hide-sm">Added</th><th></th></tr></thead><tbody></tbody></table></div>
+          </div>
+        </div>
+      </div>
+      <div class="card"><h2>Lessons written by agents</h2><div id="lessons"></div></div>
+    </section>
 
-  <section id="tab-keys" hidden>
-    <h2>Keys &amp; budget</h2>
-    <p class="lead">One OpenRouter key per agent. Keys are stored in <span class="mono">.env</span> and never shown in full. Set limits in the OpenRouter panel.</p>
-    <div class="card"><table id="keyTable">
-      <thead><tr><th>Key</th><th>Status</th><th>Used / limit</th><th>Usage</th><th>Reset</th><th></th></tr></thead>
-      <tbody></tbody>
-    </table><p class="muted" id="keyTotal"></p></div>
-  </section>
+    <section data-view="flow" hidden>
+      <div class="row" style="margin-bottom:var(--gap)"><span class="seg" id="flowProjects"></span><span class="grow"></span>
+        <label class="row" style="gap:6px"><input type="checkbox" id="flowFollow" checked>Follow the project being worked on</label><span class="muted" id="flowUpdated"></span></div>
+      <div class="card flow-now" id="flowNow"></div>
+      <div class="card"><div class="flow-scroll"><div class="flow-graph" id="flowGraph"></div></div></div>
+      <p class="muted">A project is a folder. Work you do by running <span class="mono">hermes</span> in that folder is in the last column, “Direct work with you”. Read the rest left to right: a task starts when the tasks pointing to it are finished. The small labels in a box are the agents that worked on it, in order. A green flashing box and a moving line show where work is happening right now. Click a box for details.</p>
+    </section>
 
-  <section id="tab-kb" hidden>
-    <h2>Knowledge</h2>
-    <p class="lead">Local knowledge base: files in <span class="mono">knowledge/</span>, indexed on this Mac.</p>
-    <div class="card row" id="kbStatus"></div>
-    <div class="card">
-      <form class="row" id="kbSearchForm"><input class="grow" id="kbQuery" placeholder="Test a search, e.g. HAL_UART_Init or 'why FreeRTOS'"><button class="btn primary">Search</button></form>
-      <div id="kbHits"></div>
-    </div>
-    <div class="card">
-      <div class="row" style="margin-bottom:12px"><h3 class="grow" style="margin:0">Library</h3><span id="indexJob" class="muted"></span></div>
+    <section data-view="office" hidden>
+      <div class="office-bar">
+        <div class="door" id="officeDoor" title="New tasks arrive here">🚪 <b>Inbox</b> <span class="tray" id="officeInbox"></span></div>
+        <div class="door" title="Finished today">📦 <b>Done</b> <span class="tray" id="officeDone"></span></div>
+        <span class="grow"></span><span class="muted" id="officeStatus"></span>
+      </div>
+      <div id="office"></div>
+      <p class="muted">Each room is a department and each desk is an agent. A lit screen and typing hands mean the agent is working right now. Papers on a desk are tasks waiting for that agent; a red mark means blocked. Click an agent or a paper for details. Updates every 4 seconds.</p>
+    </section>
+
+    <section data-view="activity" hidden>
+      <div class="row" style="margin-bottom:var(--gap)">
+        <div class="seg" id="actRange" role="group" aria-label="Period for totals"><button data-r="today" aria-pressed="true">Today</button><button data-r="7d">7 days</button><button data-r="30d">30 days</button><button data-r="all">All time</button></div>
+        <select id="actDept" aria-label="Department" style="width:auto"></select>
+        <span class="grow"></span><span class="muted" id="actUpdated"></span>
+      </div>
+      <div class="stats" id="actStats"></div>
+      <div class="card"><h2>Working now</h2><div id="actRunning" style="margin-top:8px"></div></div>
+      <div class="card"><div class="row"><h2 class="grow">Direct work</h2><span class="muted" id="actDirectCount"></span></div>
+        <p class="help" style="margin:2px 0 8px">Sessions where you talked to an agent yourself: <span class="mono">hermes</span> in a project folder, the panel chat, a messenger. They do not go through the task board.</p>
+        <div id="actDirect"></div></div>
+      <div class="card"><div class="row"><h2 class="grow">Tasks</h2><span id="actCounts" class="row"></span></div><div id="actTasks" style="margin-top:6px"></div></div>
+      <div class="card" id="actPaperclipCard" hidden><div class="row"><h2 class="grow">Paperclip</h2><span id="actPaperclipTotal" class="muted"></span></div>
+        <div id="actPaperclipTasks" style="margin-top:6px"></div>
+        <table id="actPaperclipAgents" style="margin-top:8px"></table>
+        <p class="muted" id="actPaperclipNote" style="margin-bottom:0"></p></div>
+      <div class="split halves">
+        <div class="card"><h2>By agent</h2><table id="actByProfile" style="margin-top:8px"></table></div>
+        <div class="card"><h2>By model</h2><table id="actByModel" style="margin-top:8px"></table></div>
+      </div>
+      <p class="muted">Tokens and costs come from Hermes' own session records on this Mac. Costs are estimates from token counts and list prices; the exact amounts billed are under Software → Keys &amp; budget. "Cached" tokens are re-read context, billed at a much lower rate.</p>
+    </section>
+
+    <section data-view="services" hidden>
+      <p class="lead">Health of the local services, the tools agents can be given, and the Hermes profiles.</p>
+      <div class="card" id="svc"></div>
+      <div class="card">
+        <div class="row"><b class="grow">Ping the software agents</b><span class="muted">one tiny real call each - costs a few cents in total</span><button class="btn" id="pingBtn">Ping all</button></div>
+        <div id="pingOut" class="mono" style="margin-top:8px"></div>
+      </div>
+    </section>
+
+    <!-- ================= software department ================= -->
+    <!-- every department, the software department included, uses the screens below -->
+    <section data-view="dept:rules" hidden>
+      <p class="lead" id="rulesLead"></p>
       <div class="split">
-        <div>
-          <div class="list" id="folderList"></div>
-          <form class="row" id="newFolderForm" style="margin-top:8px"><input class="grow" id="newFolder" placeholder="new folder, e.g. datasheets/stm32"><button class="btn">Add</button></form>
-        </div>
-        <div>
-          <div class="row" style="margin-bottom:8px"><b class="grow mono" id="folderTitle"></b><button class="btn" id="renameFolderBtn">Rename</button><button class="btn danger" id="deleteFolderBtn">Delete folder</button></div>
-          <label id="dropZone" class="dropzone">
-            <input type="file" id="fileInput" multiple hidden accept=".pdf,.md,.markdown,.txt,.rst,.yaml,.yml,.json,.toml,.ini,.csv,.c,.h,.cpp,.hpp,.cc,.py,.js,.ts,.tsx,.go,.rs,.java,.swift,.sh">
-            <b>Drop files here</b> or click to choose · PDF, Markdown, text, code · max 100 MB each
-          </label>
-          <div id="uploadOut"></div>
-          <table id="fileTable" style="margin-top:8px"><thead><tr><th>File</th><th>Size</th><th>Chunks</th><th class="hide-sm">Added</th><th></th></tr></thead><tbody></tbody></table>
+        <div class="card list" id="policyList"></div>
+        <div class="card">
+          <div class="row" style="margin-bottom:8px"><b id="policyName" class="grow mono"></b><span id="policyChars" class="muted"></span><button class="btn primary" id="policySave">Save</button></div>
+          <textarea id="policyText" class="code" spellcheck="false" aria-label="Rules text"></textarea>
         </div>
       </div>
-    </div>
-    <div class="card"><h3 style="margin-top:0">Lessons written by agents</h3><div id="lessons"></div></div>
-  </section>
+    </section>
 
-  <section id="tab-services" hidden>
-    <h2>Services</h2>
-    <p class="lead">Health of the local services and the agent profiles.</p>
-    <div class="card" id="svc"></div>
-    <div class="card">
-      <div class="row"><b class="grow">Ping agents</b><span class="muted">one tiny real call each - costs a few cents in total</span><button class="btn" id="pingBtn">Ping all</button></div>
-      <div id="pingOut" class="mono" style="margin-top:8px"></div>
-    </div>
-  </section>
+    <!-- backup and restore, the same for every department -->
+    <section data-view="dept:backup" hidden>
+      <p class="lead" id="backupLead"></p>
+      <div class="card">
+        <form class="row" id="backupForm">
+          <input class="grow" id="backupLabel" aria-label="Name of the backup" placeholder="Name it, e.g. before changing models" maxlength="80">
+          <label class="row" style="gap:6px" title="Stored only on this Mac, readable only by you"><input type="checkbox" id="backupKeys">Include API keys</label>
+          <button class="btn primary">Back up now</button>
+          <button class="btn" type="button" id="backupImportBtn">Add a backup file…</button>
+          <input type="file" id="backupFile" accept=".json,application/json" hidden>
+        </form>
+      </div>
+      <div class="card table-wrap"><table id="backupTable">
+        <thead><tr><th>When</th><th>Name</th><th>Contains</th><th></th></tr></thead><tbody></tbody>
+      </table></div>
+      <p class="muted">Backups are files in <span class="mono">data/backups/</span> on this Mac; they are not in git. Restoring first saves the current settings as a backup named “before restore”, so a restore can itself be undone.</p>
+    </section>
 
-  <section id="tab-apply" hidden>
-    <h2>Apply</h2>
-    <p class="lead">Review pending changes, then apply them to the Hermes profiles. Every apply is a git commit and can be undone.</p>
-    <div class="card">
-      <div class="row" style="margin-bottom:8px"><input class="grow" id="applyMsg" placeholder="What changed? (commit message)"><button class="btn" id="discardBtn">Discard edits</button><button class="btn primary" id="applyBtn">Apply</button></div>
-      <div id="pendingOut"></div>
-    </div>
-    <div class="card">
-      <div class="row"><b class="grow">History</b><button class="btn danger" id="undoBtn">Undo last panel change</button></div>
-      <pre id="history" class="mono"></pre>
-    </div>
-  </section>
-</main>
+    <!-- ================= engine departments ================= -->
+    <section data-view="dept:team" hidden>
+      <p class="lead">Each role is one Hermes profile. Changes are saved to <span class="mono" data-dept-file></span>; go to <b>Apply</b> to push them to Hermes.</p>
+      <div id="deptNotice"></div>
+      <div class="row" style="margin-bottom:12px"><span id="presetRow" class="row"></span><span class="grow"></span><span id="modelsAge" class="muted"></span><button class="btn" id="addRoleBtn" type="button">+ Add role</button></div>
+      <div id="dRoles"></div>
+      <datalist id="deptModelList"></datalist>
+    </section>
+
+    <section data-view="dept:routing" hidden>
+      <p class="lead">Who leads, who reviews, and how this department's work is handed out.</p>
+      <div class="card form-grid" id="dRouting"></div>
+      <div class="card">
+        <div class="row"><b class="grow">This department's tasks</b><span id="dBoardState" class="muted"></span><button class="btn" id="dBoardRefresh" type="button">Refresh</button></div>
+        <div class="table-wrap"><table id="dBoardTable" style="margin-top:8px"><thead><tr><th>Task</th><th>Assignee</th><th>Status</th><th class="hide-sm">Created</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section data-view="dept:keys" hidden>
+      <p class="lead" id="dKeysLead"></p>
+      <div class="card table-wrap" id="dKeyCard"><table id="dKeyTable">
+        <thead><tr><th>Key</th><th>Status</th><th>Used by</th><th></th></tr></thead><tbody></tbody>
+      </table></div>
+      <div class="card table-wrap"><table id="dRoleKeyTable">
+        <thead><tr><th>Role</th><th>Uses</th><th>Used / limit</th><th>Usage</th><th></th></tr></thead><tbody></tbody>
+      </table><p class="muted" id="dKeyTotal" style="margin:10px 8px 0"></p></div>
+    </section>
+
+    <section data-view="dept:models" hidden>
+      <p class="lead" id="benchNote"></p>
+      <div class="card">
+        <div class="row"><input class="grow" id="modelFilter" aria-label="Search models" placeholder="Search all tool-capable models, e.g. sonnet, flash, grok"><button class="btn" id="modelsRefresh" type="button">Refresh list from OpenRouter</button></div>
+        <p class="help">With the box empty, only models that have a benchmark score are listed. Prices are US dollars per 1 million tokens.</p>
+        <div class="table-wrap"><table id="compare" style="margin-top:8px"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section data-view="dept:apply" hidden>
+      <p class="lead">What Hermes has compared with this department's configuration. Applying creates or updates the Hermes profiles: model, tools, API key and role rules.</p>
+      <div class="card">
+        <div class="row" style="margin-bottom:8px"><b class="grow" id="dApplySummary"></b><button class="btn primary" id="dApplyBtn">Apply to Hermes</button></div>
+        <div class="table-wrap"><table id="dDiffTable"><thead><tr><th>Role</th><th>State</th><th>Apply will change</th></tr></thead><tbody></tbody></table></div>
+      </div>
+      <div class="card"><b>Last apply</b><pre id="dApplyLog" class="mono" tabindex="0">Nothing applied in this session yet.</pre></div>
+      <div class="card" id="dHistoryCard" hidden>
+        <div class="row"><b class="grow">History</b><input id="dApplyMsg" aria-label="Note for the next apply" placeholder="Note for the next apply (optional)" style="max-width:320px">
+          <button class="btn" id="dDiscardBtn" type="button">Discard changes not applied</button><button class="btn danger" id="dUndoBtn" type="button">Undo last apply</button></div>
+        <p class="help">Every apply of this department is recorded, so the last one can be undone.</p>
+        <pre id="dHistory" class="mono"></pre>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="saveBar" hidden><span class="grow" id="saveBarText">Unsaved changes</span><button class="btn" id="draftDiscard" type="button">Discard</button><button class="btn primary" id="draftSave" type="button">Save</button></div>
 
 <dialog id="confirm">
   <form method="dialog">
     <p id="confirmText"></p>
-    <div class="row" style="justify-content:flex-end"><button class="btn" value="no">Cancel</button><button class="btn primary" value="yes">Continue</button></div>
+    <div class="row end"><button class="btn" value="no">Cancel</button><button class="btn primary" value="yes">Continue</button></div>
   </form>
+</dialog>
+<dialog id="agentDialog">
+  <div class="row"><h2 class="grow" id="agTitle" style="margin:0"></h2><button class="btn" data-close type="button">Close</button></div>
+  <div id="agBody" style="margin-top:10px"></div>
 </dialog>
 <dialog id="keyDialog">
   <form method="dialog" id="keyForm">
-    <p>New value for <b id="keyName" class="mono"></b>. It is checked with OpenRouter before saving.</p>
-    <input id="keyValue" type="password" autocomplete="off" placeholder="sk-or-v1-..." required>
-    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" value="no" formnovalidate>Cancel</button><button class="btn primary" value="yes">Save key</button></div>
+    <p>New value for <b id="keyName" class="mono"></b>. <span id="keyHint"></span></p>
+    <input id="keyValue" type="password" autocomplete="off" aria-label="API key" placeholder="sk-or-v1-..." required>
+    <div class="row end" style="margin-top:12px"><button class="btn" value="no" formnovalidate>Cancel</button><button class="btn primary" value="yes">Save key</button></div>
+  </form>
+</dialog>
+<dialog id="newDeptDialog">
+  <form id="newDeptForm" autocomplete="off">
+    <h2>Add a department</h2>
+    <p class="muted">Creates a folder with three starter roles (lead, specialist, reviewer) that you then rename and describe. No Hermes profile is created until you apply.</p>
+    <label for="ndTitle">Title</label><input id="ndTitle" required placeholder="Research">
+    <label for="ndName">Folder name</label><input id="ndName" required pattern="[a-z][a-z0-9\-]{1,30}" placeholder="research">
+    <p class="help">Lowercase letters, digits and <span class="mono">-</span>.</p>
+    <label for="ndPrefix">Role prefix</label><input id="ndPrefix" required pattern="[a-z][a-z0-9]{0,7}" placeholder="rs">
+    <p class="help">Short and unique. The roles become <span class="mono">rs-lead</span>, <span class="mono">rs-specialist</span>, <span class="mono">rs-review</span>.</p>
+    <p id="ndError" class="bad" role="alert"></p>
+    <div class="row end"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary">Create department</button></div>
+  </form>
+</dialog>
+<dialog id="newRoleDialog">
+  <form id="newRoleForm" autocomplete="off">
+    <h2>Add a role</h2>
+    <p class="muted">A role becomes one Hermes profile when you apply. Its name must be unique across all departments, so keep the department's prefix.</p>
+    <label for="nrName">Role name</label><input id="nrName" required pattern="[a-z][a-z0-9\-]{1,30}" placeholder="rs-analyst">
+    <label for="nrTitle">Title</label><input id="nrTitle" required placeholder="Analyst">
+    <p id="nrError" class="bad" role="alert"></p>
+    <div class="row end"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary">Add role</button></div>
   </form>
 </dialog>
 <div id="toast" role="status"></div>
 
 <script>
+"use strict";
 const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const enc = encodeURIComponent;
+const clone = o => JSON.parse(JSON.stringify(o));
 async function api(path, opts = {}) {
   const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts,
     body: opts.body ? JSON.stringify(opts.body) : undefined });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.detail || r.statusText);
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : data.detail ? JSON.stringify(data.detail) : r.statusText);
   return data;
 }
-function toast(msg, bad) { const t = $("#toast"); t.textContent = msg; t.style.background = bad ? "var(--bad)" : ""; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2600); }
+function toast(msg, bad) { const t = $("#toast"); t.textContent = msg; t.style.background = bad ? "var(--bad)" : ""; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), bad ? 5000 : 2600); }
 function ask(text) { return new Promise(res => { const d = $("#confirm"); $("#confirmText").textContent = text; d.returnValue = ""; d.onclose = () => res(d.returnValue === "yes"); d.showModal(); }); }
 const money = v => v == null ? "–" : "$" + Number(v).toFixed(v < 1 ? 4 : 2);
+const usd = v => v == null ? "?" : "$" + Number(v).toFixed(2);
+const chip = (kind, text) => `<span class="chip ${kind}">${esc(text)}</span>`;
+$$("dialog [data-close]").forEach(b => b.onclick = () => b.closest("dialog").close());
 
-// ---- tabs ----
-const loaders = {};
-document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => {
-  document.querySelectorAll("nav button").forEach(x => x.setAttribute("aria-selected", x === b));
-  document.querySelectorAll("main section").forEach(s => s.hidden = s.id !== "tab-" + b.dataset.tab);
-  try { localStorage.setItem("tab", b.dataset.tab); } catch {}
-  loaders[b.dataset.tab]?.();
-}));
-
-// ---- team ----
-let MODELS = {};
-loaders.team = async () => {
-  const [team, models] = await Promise.all([api("/api/team"), api("/api/models").catch(() => [])]);
-  MODELS = Object.fromEntries(models.map(m => [m.id, m]));
-  $("#modelList").innerHTML = models.map(m => `<option value="${esc(m.id)}">$${m.in} / $${m.out} · ≈$${m.per_call}/call</option>`).join("");
-  const price = id => MODELS[id] ? `<div class="muted mono">$${MODELS[id].in} / $${MODELS[id].out} · ≈$${MODELS[id].per_call}/call</div>` : (id ? `<div class="bad">not on OpenRouter</div>` : "");
-  $("#teamTable tbody").innerHTML = Object.entries(team.roles).map(([role, s]) => `
-    <tr data-role="${esc(role)}">
-      <td><b>${esc(role)}</b><div class="muted mono">${esc(s.key_env)}</div></td>
-      <td><input list="modelList" name="model" value="${esc(s.model)}">${price(s.model)}</td>
-      <td><input list="modelList" name="fallback" value="${esc(s.fallback || "")}">${price(s.fallback)}</td>
-      <td><select name="effort">${["low","medium","high"].map(e => `<option ${e === s.effort ? "selected" : ""}>${e}</option>`).join("")}</select></td>
-      <td class="hide-sm"><textarea name="description" style="min-height:64px;font-family:inherit">${esc(s.description)}</textarea></td>
-      <td><button class="btn" data-save disabled>Save</button></td>
-    </tr>`).join("");
-  document.querySelectorAll("#teamTable tr[data-role]").forEach(tr => {
-    const btn = tr.querySelector("[data-save]");
-    tr.addEventListener("input", () => { btn.disabled = false; tr.classList.add("dirty"); });
-    btn.addEventListener("click", async () => {
-      const v = n => tr.querySelector(`[name=${n}]`).value.trim();
-      try {
-        await api("/api/team/" + tr.dataset.role, { method: "PUT", body: { model: v("model"), fallback: v("fallback"), effort: v("effort"), description: v("description") } });
-        toast(`${tr.dataset.role} saved - go to Apply`); loaders.team(); refreshPending();
-      } catch (e) { toast(e.message, true); }
-    });
-  });
-};
-
-// ---- routing ----
-loaders.routing = async () => {
-  const { routing, roles } = await api("/api/routing");
-  if (!$("#modelList").options.length) api("/api/models").then(ms => $("#modelList").innerHTML = ms.map(m => `<option value="${esc(m.id)}">$${m.in} / $${m.out}</option>`).join("")).catch(() => {});
-  document.querySelectorAll("#routingForm [data-roles]").forEach(s => s.innerHTML = roles.map(r => `<option>${esc(r)}</option>`).join(""));
-  for (const [k, v] of Object.entries(routing)) { const el = $(`#routingForm [name=${k}]`); if (el) el.value = v; }
-  loadBoard();
-};
-$("#routingForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  const body = Object.fromEntries(new FormData(e.target));
-  try { await api("/api/routing", { method: "PUT", body }); toast("Routing saved - go to Apply"); refreshPending(); } catch (err) { toast(err.message, true); }
+// ---- key dialog (shared by the software keys and the departments' keys) ----
+let keySave = null;
+function openKeyDialog(name, hint, onSave) { $("#keyName").textContent = name; $("#keyHint").textContent = hint; $("#keyValue").value = ""; keySave = onSave; $("#keyDialog").showModal(); }
+$("#keyDialog").addEventListener("close", async () => {
+  const d = $("#keyDialog"), v = $("#keyValue").value.trim(); $("#keyValue").value = "";
+  if (d.returnValue !== "yes" || !v || !keySave) return;
+  try { await keySave(v); } catch (e) { toast(e.message, true); }
 });
-const STATUS_CLASS = { done: "ok", running: "warn", review: "warn", blocked: "bad" };
-async function loadBoard() {
-  const b = await api("/api/board");
-  $("#svcState").innerHTML = Object.entries(b.services).map(([k, v]) => `${esc(k)}: <span class="${v === "running" || v === "not running" && k === "escalator" ? "ok" : "bad"}">${esc(v === "not running" && k === "escalator" ? "idle (runs every 60s)" : v)}</span>`).join(" · ");
-  $("#boardTable tbody").innerHTML = b.tasks.length ? b.tasks.map(t => `<tr><td><span class="mono muted">${esc(t.id)}</span> ${esc(t.title)}</td><td>${esc(t.assignee || "–")}</td><td class="${STATUS_CLASS[t.status] || ""}">${esc(t.status)}</td><td class="hide-sm muted">${t.created_at ? new Date(t.created_at * 1000).toLocaleString() : ""}</td></tr>`).join("") : `<tr><td colspan="4" class="muted">No tasks yet. Ask the manager (hermes) for a coding task.</td></tr>`;
-}
-$("#boardRefresh").onclick = loadBoard;
 
-// ---- policies ----
-let currentPolicy = null;
-loaders.policies = async () => {
-  const list = await api("/api/policies");
-  $("#policyList").innerHTML = list.map(p => `<button data-p="${esc(p.path)}">${esc(p.path)} <span class="muted">${p.chars}</span></button>`).join("");
-  $("#policyList").querySelectorAll("button").forEach(b => b.addEventListener("click", () => openPolicy(b.dataset.p)));
-  openPolicy(currentPolicy || list[0]?.path);
+// ================= routing between pages =================
+const S = { route: { view: "overview" }, company: null, dept: null, d: null, draft: null, models: [], modelIndex: {}, bench: {}, swPending: false };
+const DEPT_TABS = [["team", "Team"], ["routing", "Routing"], ["rules", "Rules"], ["keys", "Keys"], ["models", "Models"], ["apply", "Apply"], ["backup", "Backup"]];
+const loaders = {};
+let currentHash = "";
+
+function parseHash() {
+  const p = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
+  if (p[0] === "software") { const tab = p[1] === "policies" ? "rules" : p[1]; return { view: "dept", dept: "software", tab: DEPT_TABS.some(t => t[0] === tab) ? tab : "team" }; }
+  if (p[0] === "d" && p[1]) return { view: "dept", dept: decodeURIComponent(p[1]), tab: DEPT_TABS.some(t => t[0] === p[2]) ? p[2] : "team" };
+  if (p[0] === "knowledge" || p[0] === "services" || p[0] === "activity" || p[0] === "office" || p[0] === "flow") return { view: p[0] };
+  return { view: "overview" };
+}
+// The department whose Team, Models and save bar are on screen; the software department is "software".
+const routeDept = r => r.view === "dept" ? r.dept : null;
+const deptBase = name => name === "software" ? "#/software/" : `#/d/${enc(name)}/`;
+const navKey = r => r.view !== "dept" ? r.view : r.dept === "software" ? "software" : "d:" + r.dept;
+const editing = () => routeDept(S.route) !== null;
+const draftDirty = () => !!(S.d && S.draft && JSON.stringify(S.draft) !== JSON.stringify(S.d.config));
+function updateSaveBar() {
+  const dirty = editing() && draftDirty();
+  $("#saveBar").hidden = !dirty;
+  if (dirty) $("#saveBarText").textContent = `Unsaved changes in ${S.d.config.name || S.dept}`;
+}
+
+async function navigate() {
+  const next = parseHash();
+  if (draftDirty() && routeDept(next) !== S.dept) {
+    if (!await ask(`You have unsaved changes in ${S.d.config.name || S.dept}. Leave and lose them?`)) { history.replaceState(null, "", currentHash || "#/overview"); return; }
+    S.draft = clone(S.d.config);
+  }
+  currentHash = location.hash; S.route = next;
+  try { localStorage.setItem("route", location.hash); } catch {}
+  const key = next.tab ? `${next.view}:${next.tab}` : next.view;
+  $$("main > section").forEach(s => s.hidden = !s.dataset.view.split(" ").includes(key));
+  $$("#side [data-nav]").forEach(a => a.toggleAttribute("aria-current", false));
+  const active = $(`#side [data-nav="${CSS.escape(navKey(next))}"]`);
+  active?.setAttribute("aria-current", "page");
+  renderHead();
+  updateSaveBar();
+  try { await loaders[key]?.(); renderHead(); } catch (e) { toast(e.message, true); }
+}
+window.addEventListener("hashchange", navigate);
+window.addEventListener("beforeunload", e => { if (draftDirty()) e.preventDefault(); });
+
+function renderHead() {
+  const r = S.route, tabs = $("#tabs");
+  const titles = { flow: ["Flow", "which task follows which, and who is on it now"], office: ["Office", "your team at work - click anyone to see what they are doing"], activity: ["Activity", "who is working, on what, and what it cost"], overview: ["Overview", "all departments"], knowledge: ["Knowledge", "shared knowledge base"], services: ["Services", "this machine"] };
+  let title, sub, chips = "", list = null, base = "";
+  if (r.view === "dept") {
+    const loaded = S.d && S.dept === r.dept;
+    title = loaded ? (S.d.config.name || r.dept) : r.dept === "software" ? "Software" : r.dept; sub = r.dept === "software" ? "team.yaml" : `departments/${r.dept}`; list = DEPT_TABS; base = deptBase(r.dept);
+    if (loaded) {
+      const roles = Object.values(S.d.status.roles).filter(x => x.enabled);
+      chips = (S.d.status.in_sync ? chip("ok", "in sync with Hermes") : chip("warn", "not applied yet")) +
+        (roles.every(x => x.has_key) ? chip("ok", "API key set") : chip("bad", roles.some(x => x.has_key) ? "some roles have no key" : "no API key"));
+    }
+  } else [title, sub] = titles[r.view];
+  $("#pageTitle").textContent = title; $("#pageSub").textContent = sub; $("#pageChips").innerHTML = chips;
+  document.title = `${title} – AI Company Panel`;
+  tabs.hidden = !list;
+  tabs.innerHTML = (list || []).map(([id, label]) => `<a role="tab" href="${base}${id}" aria-selected="${id === r.tab}">${esc(label)}${
+    id === "apply" && S.d && S.dept === r.dept && !S.d.status.in_sync ? ' <span class="badge">!</span>' : ""}</a>`).join("");
+}
+
+// ================= company: overview, sidebar =================
+async function loadCompany(force) {
+  if (!S.company || force) { S.company = await api("/api/departments"); renderSide(); }
+  return S.company;
+}
+function renderSide() {
+  const c = S.company;
+  $("#deptNav").innerHTML = c.departments.map(d => `<a class="item" href="#/d/${enc(d.name)}/team" data-nav="d:${esc(d.name)}"><span class="grow">${esc(d.title)}</span>${
+    d.error ? '<span class="dot bad"></span>' : d.in_sync ? "" : '<span class="badge">!</span>'}</a>`).join("");
+  if (S.route.view === "dept") $(`#side [data-nav="${CSS.escape(navKey(S.route))}"]`)?.setAttribute("aria-current", "page");
+  const env = c.environment, line = (ok, text) => `<span class="env"><span class="dot ${ok ? "ok" : "warn"}"></span>${esc(text)}</span>`;
+  $("#envBox").innerHTML = line(env.hermes.found, env.hermes.found ? (env.hermes.version.split("·")[0].trim() || "Hermes found") : "Hermes not found") +
+    line(env.dispatcher_running === true, env.dispatcher_running ? "Task dispatcher running" : "Task dispatcher not running");
+}
+loaders.overview = async () => {
+  const [c, team] = await Promise.all([loadCompany(true), api("/api/team").catch(() => null)]);
+  const cards = [];
+  if (team) cards.push(`<a class="card" href="#/software/team"><div class="row"><h2 class="grow">Software</h2><span class="muted mono">team.yaml</span></div>
+    <p class="muted grow" style="margin:0">${Object.keys(team.roles).length} roles, the manager routes work to them. Has its own routing, policies and the knowledge base.</p>
+    <div class="row">${S.swPending ? chip("warn", "changes not applied") : chip("ok", "no pending changes")}</div></a>`);
+  for (const d of c.departments) cards.push(`<a class="card" href="#/d/${enc(d.name)}/team"><div class="row"><h2 class="grow">${esc(d.title)}</h2><span class="muted mono">${esc(d.name)}</span></div>
+    ${d.error ? `<p class="bad grow" style="margin:0">${esc(d.error)}</p>` : `<p class="muted grow" style="margin:0">${d.enabled} roles, lead <span class="mono">${esc(d.lead)}</span>. Talk to it with <span class="mono">hermes -p ${esc(d.lead)}</span>.</p>
+    <div class="row">${d.in_sync ? chip("ok", "in sync with Hermes") : chip("warn", "not applied yet")}${d.has_key ? chip("ok", "API key set") : chip(d.roles_with_key ? "warn" : "bad", d.roles_with_key ? `key for ${d.roles_with_key} of ${d.enabled} roles` : "no API key")}</div>`}</a>`);
+  cards.push(`<button class="card" type="button" id="addDeptCard">+ Add a department</button>`);
+  $("#overviewCards").innerHTML = cards.join("");
+  $("#addDeptCard").onclick = openNewDept;
+  const env = c.environment;
+  $("#overviewEnv").innerHTML = chip(env.hermes.found ? "ok" : "bad", env.hermes.found ? (env.hermes.version.split("·")[0].trim() || "Hermes found") : "Hermes not found") +
+    chip(env.dispatcher_running ? "ok" : "warn", env.dispatcher_running ? "task dispatcher running" : "task dispatcher not running") +
+    Object.values(env.tools).filter(t => t.kind === "mcp").map(t => chip(t.available ? "ok" : "warn", t.label.split(" (")[0].replace(" and skill", "") + (t.available ? "" : " not available"))).join("");
 };
-async function openPolicy(path) {
-  if (!path) return;
-  currentPolicy = path;
+// ================= account credit =================
+const C = { data: null };
+async function loadCredits(refresh) {
+  try { C.data = await api("/api/credits" + (refresh ? "?refresh=true" : "")); } catch { return; }
+  const c = C.data, b = $("#creditBanner");
+  if (c.error || c.left == null) { b.hidden = true; return; }
+  const level = c.left < 1 ? "bad" : c.left < 3 ? "warn" : "";
+  b.hidden = !level; b.className = "banner " + level;
+  if (level) b.innerHTML = `<b>${level === "bad" ? "OpenRouter credit is used up" : "OpenRouter credit is running low"}</b>
+    <span class="grow">$${c.left.toFixed(2)} left of $${c.total.toFixed(2)}. ${level === "bad" ? "Agents cannot work: every request is refused until you add credit. Key limits do not help; this is the account balance." : "Agents will stop when it reaches zero."}</span>
+    <a class="btn" href="https://openrouter.ai/settings/credits" target="_blank" rel="noopener">Add credit</a><button class="btn" type="button" id="creditRecheck">Check again</button>`;
+  const again = $("#creditRecheck"); if (again) again.onclick = () => loadCredits(true).then(() => toast("Balance checked"));
+  if (S.route.view === "activity" && A.data) renderActivity(A.data);
+}
+loadCredits(); setInterval(() => { if (!document.hidden) loadCredits(); }, 60000);
+
+// ================= activity =================
+const A = { range: "today", dept: "", timer: null, open: new Set(), data: null };
+const tok = n => n == null ? "–" : n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(n);
+const dur = s => s == null ? "–" : s < 60 ? s + "s" : s < 3600 ? Math.floor(s / 60) + "m " + (s % 60) + "s" : Math.floor(s / 3600) + "h " + Math.floor(s % 3600 / 60) + "m";
+const when = t => t ? new Date(t * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "–";
+const cost = u => !u || u.total == null ? "–" : (u.cost_unknown && !u.cost ? "unknown" : "~$" + u.cost.toFixed(u.cost < 1 ? 3 : 2) + (u.cost_unknown ? "+" : ""));
+const usageLine = u => u && u.total != null ? `in ${tok(u.input)} · out ${tok(u.output)} · cached ${tok(u.cache_read)}` : "no usage recorded";
+const STATUS = { done: ["ok", "done"], running: ["warn", "running"], review: ["warn", "in review"], blocked: ["bad", "blocked"], ready: ["", "ready"], todo: ["", "waiting"], triage: ["", "triage"], scheduled: ["", "scheduled"] };
+const OUTCOME = { completed: "ok", review_requested: "ok", changes_requested: "warn", crashed: "bad", timed_out: "bad", gave_up: "bad", spawn_failed: "bad", stale: "bad", reclaimed: "warn", blocked: "bad" };
+const CAUSE = { out_of_credits: "no credits", bad_key: "API key rejected", rate_limited: "rate limited", model_unavailable: "model unavailable" };
+const outText = r => r.cause ? CAUSE[r.cause] || r.cause : (r.outcome || r.status).replace(/_/g, " ");
+const shortModel = m => (m || "?").split("/").pop();
+
+// Work done by talking to an agent directly (hermes in a project folder, the panel chat), not through the task board.
+const SOURCE = { cli: "terminal", panel: "panel chat", tool: "one-off run", paperclip: "Paperclip", whatsapp: "WhatsApp", telegram: "Telegram", cron: "scheduled" };
+const DIRECT_STATE = { working: ["ok", "working now"], open: ["warn", "open, waiting for you"], ended: ["", "finished"] };
+const directWorking = d => (d.direct || []).filter(x => x.state === "working");
+const directTitle = x => x.title || (x.messages ? "untitled chat" : "new chat, nothing asked yet");
+const folderName = w => w ? w.replace(/\/+$/, "").split("/").pop() : "";
+
+function renderActivity(d) {
+  A.data = d;
+  const sel = $("#actDept");
+  if (sel.options.length !== d.departments.length + 1) sel.innerHTML = `<option value="">All departments</option>` + d.departments.map(x => `<option value="${esc(x.name)}">${esc(x.title)}</option>`).join("");
+  sel.value = A.dept;
+  const c = d.counts, t = d.total, label = { today: "today", "7d": "last 7 days", "30d": "last 30 days", all: "all time" }[A.range];
+  const open = (c.running || 0) + (c.ready || 0) + (c.todo || 0) + (c.review || 0);
+  $("#actStats").innerHTML = [
+    [d.working ?? d.running.length, "agents working now"],
+    [open ? `${open} open` : (c.blocked ? "stopped" : "all done"), `${c.done || 0} done · ${c.blocked || 0} blocked`],
+    [tok(t.total || 0), `tokens ${label}`],
+    [tok((t.input || 0) + (t.output || 0)), `new tokens (in ${tok(t.input || 0)} · out ${tok(t.output || 0)})`],
+    [t.total ? cost(t) : "$0", `estimated cost ${label}`],
+    ...(C.data && C.data.left != null ? [["$" + C.data.left.toFixed(2), `account credit left of $${C.data.total.toFixed(2)}`]] : []),
+  ].map(([v, l]) => `<div class="stat"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join("");
+  $$("[data-live]").forEach(e => e.hidden = !(d.working ?? d.running.length));
+
+  $("#actRunning").innerHTML = d.running.length ? `<table><thead><tr><th>Agent</th><th>Model</th><th>Task</th><th>Running</th><th>Doing</th><th class="num">Tokens so far</th><th class="num">Cost</th></tr></thead><tbody>${
+    d.running.map(r => { const quiet = r.activity_at ? Math.round(d.now - r.activity_at) : null;
+      return `<tr><td><span class="dot ok pulse" style="display:inline-block"></span> <b>${esc(r.profile)}</b><div class="muted">${esc(r.dept)}</div></td>
+      <td class="mono">${esc(shortModel(r.model))}</td>
+      <td><span class="mono muted">${esc(r.task_id)}</span><br>${esc(r.title)}</td>
+      <td>${dur(r.seconds)}${r.timeout ? `<div class="muted">limit ${Math.round(r.timeout / 60)}m</div>` : ""}</td>
+      <td>${esc(r.activity || "starting")}${quiet != null && quiet > 120 ? `<div class="warn">quiet for ${dur(quiet)}</div>` : ""}<div class="muted">${r.tool_calls ?? 0} tool calls · ${r.usage?.api_calls ?? 0} model calls</div></td>
+      <td class="num"><b>${tok(r.usage?.total)}</b><div class="muted">${usageLine(r.usage)}</div></td><td class="num">${cost(r.usage)}</td></tr>`; }).join("")}</tbody></table>`
+    : "";
+  const dw = directWorking(d);
+  $("#actRunning").innerHTML += dw.length ? `<table><thead><tr><th>Agent</th><th>Model</th><th>Direct work</th><th>Project folder</th><th>Running</th><th>Doing</th><th class="num">Tokens so far</th></tr></thead><tbody>${
+    dw.map(x => `<tr><td><span class="dot ok pulse" style="display:inline-block"></span> <b>${esc(x.role)}</b><div class="muted">${esc(SOURCE[x.source] || x.source)}</div></td>
+      <td class="mono">${esc(shortModel(x.model))}</td><td>${esc(directTitle(x))}</td><td class="mono" title="${esc(x.cwd)}">${esc(folderName(x.cwd) || "–")}</td>
+      <td>${dur(x.seconds)}</td><td>${esc(friendly(x.activity))}<div class="muted">${x.tool_calls ?? 0} tool calls</div></td><td class="num"><b>${tok(x.usage?.total)}</b></td></tr>`).join("")}</tbody></table>` : "";
+  if (!d.running.length && !dw.length) $("#actRunning").innerHTML = `<p class="muted" style="margin:0">No agent is working right now.</p>`;
+  const direct = d.direct || [];
+  $("#actDirectCount").textContent = direct.length ? `${direct.length} session${direct.length === 1 ? "" : "s"}` : "";
+  $("#actDirect").innerHTML = direct.length ? `<table><thead><tr><th>State</th><th>Agent</th><th>What</th><th>Project folder</th><th>Started</th><th>Took</th><th class="num">Messages</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead><tbody>${
+    direct.map(x => { const [kind, text] = DIRECT_STATE[x.state];
+      return `<tr><td>${chip(kind, text)}</td><td><b>${esc(x.role)}</b><div class="muted">${esc(SOURCE[x.source] || x.source)}</div></td>
+      <td>${esc(directTitle(x))}${x.state === "working" ? `<div class="muted">${esc(friendly(x.activity))}</div>` : ""}</td>
+      <td class="mono" title="${esc(x.cwd)}">${esc(folderName(x.cwd) || "–")}</td><td class="muted">${when(x.started_at)}</td><td>${dur(x.seconds)}</td>
+      <td class="num">${x.messages ?? 0}<div class="muted">${x.tool_calls ?? 0} tools</div></td><td class="num">${tok(x.usage?.total)}</td><td class="num">${cost(x.usage)}</td></tr>`; }).join("")}</tbody></table>`
+    : `<p class="muted" style="margin:0">Nothing yet in this period. Start <span class="mono">hermes</span> in a project folder and it appears here.</p>`;
+
+  $("#actCounts").innerHTML = Object.entries(c).map(([k, n]) => chip((STATUS[k] || [""])[0], `${n} ${(STATUS[k] || [0, k])[1]}`)).join("");
+  $("#actTasks").innerHTML = d.tasks.length ? d.tasks.map(t => {
+    const [kind, text] = STATUS[t.status] || ["", t.status];
+    const flow = t.runs.map(r => `<span class="chip ${OUTCOME[r.outcome] || (r.status === "running" ? "warn" : "")}" title="${esc(shortModel(r.model))}">${esc(r.profile)}: ${esc(outText(r))}</span>`).join("→");
+    return `<details class="task" data-task="${esc(t.id)}" ${A.open.has(t.id) ? "open" : ""}><summary>
+      ${chip(kind, text)}<span class="mono muted">${esc(t.id)}</span><b class="grow">${esc(t.title)}</b>
+      <span class="muted">${esc(t.assignee || "unassigned")}</span><span class="num">${tok(t.usage.total)} tok</span><span class="num">${cost(t.usage)}</span></summary>
+      <div class="body">
+        ${t.blocked_reason ? `<p class="bad">Blocked: ${esc(t.blocked_reason)}</p>` : ""}
+        <p class="muted">Created ${when(t.created_at)} by ${esc(t.created_by || "?")} · started ${when(t.started_at)} · ${t.completed_at ? "finished " + when(t.completed_at) : "not finished"}${t.workspace ? ` · <span class="mono">${esc(t.workspace)}</span>` : ""}</p>
+        ${flow ? `<p class="flow">${flow}</p>` : `<p class="muted">Not started yet.</p>`}
+        ${t.runs.length ? `<table><thead><tr><th>Agent</th><th>Model</th><th>Result</th><th>Started</th><th>Took</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead><tbody>${t.runs.map(r => `<tr>
+          <td>${esc(r.profile)}</td><td class="mono">${esc(shortModel(r.model))}</td><td class="${OUTCOME[r.outcome] || ""}">${esc(outText(r))}${r.cause_label ? `<div class="muted">${esc(r.cause_label)}</div>` : r.error ? `<div class="muted">${esc(r.error)}</div>` : ""}</td>
+          <td class="muted">${when(r.started_at)}</td><td>${dur(r.seconds)}</td><td class="num">${tok(r.usage?.total)}<div class="muted">${usageLine(r.usage)}</div></td><td class="num">${cost(r.usage)}</td></tr>`).join("")}</tbody></table>` : ""}
+        ${t.summary ? `<p><b>Result</b></p><pre>${esc(t.summary)}</pre>` : ""}
+        ${t.body ? `<details><summary class="muted">Task description</summary><pre>${esc(t.body)}</pre></details>` : ""}
+      </div></details>`; }).join("") : `<p class="muted" style="margin:0">No tasks yet. Ask a lead (for example <span class="mono">hermes</span>) for some work.</p>`;
+  $$("#actTasks details.task").forEach(el => el.addEventListener("toggle", () => A.open[el.open ? "add" : "delete"](el.dataset.task)));
+
+  const table = (rows, first, key) => rows.length ? `<thead><tr><th>${first}</th><th class="num">Tokens</th><th class="num">In / out</th><th class="num">Cost</th></tr></thead><tbody>${rows.map(r => `<tr>
+    <td>${key(r)}</td><td class="num">${tok(r.total)}</td><td class="num muted">${tok(r.input)} / ${tok(r.output)}</td><td class="num">${cost(r)}</td></tr>`).join("")}</tbody>` : `<tbody><tr><td class="muted">Nothing in this period.</td></tr></tbody>`;
+  const pc = d.paperclip, pcShow = !!pc && (pc.available || pc.tasks.length > 0);
+  $("#actPaperclipCard").hidden = !pcShow;
+  if (pcShow) {
+    $("#actPaperclipTotal").textContent = pc.tasks.length ? `${tok(pc.total.total || 0)} tokens · ${cost(pc.total.total == null ? null : pc.total)}${pc.running ? ` · ${pc.running} running` : ""}` : "";
+    $("#actPaperclipTasks").innerHTML = pc.tasks.length ? pc.tasks.map(t => {
+      const [kind, text] = STATUS[t.status] || ["", t.status || "run"], key = "pc:" + (t.task || t.runs[0].id);
+      return `<details class="task" data-task="${esc(key)}" ${A.open.has(key) ? "open" : ""}><summary>
+        ${chip(kind, text)}<span class="mono muted">${esc(t.task)}</span><b class="grow">${esc(t.title)}</b>
+        <span class="muted">${esc([...new Set(t.runs.map(r => r.agent))].join(", "))} · ${t.runs.length} run${t.runs.length > 1 ? "s" : ""}</span><span class="num">${tok(t.usage.total)} tok</span><span class="num">${cost(t.usage)}</span></summary>
+        <div class="body"><table><thead><tr><th>Agent</th><th>Model</th><th>Result</th><th>Started</th><th>Took</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead><tbody>${t.runs.map(r => `<tr>
+          <td>${esc(r.agent)}</td><td class="mono">${esc(shortModel(r.model))}</td><td class="${r.status === "succeeded" ? "ok" : r.status === "running" ? "warn" : "bad"}">${esc(r.status)}</td>
+          <td class="muted">${when(r.started_at)}</td><td>${dur(r.seconds)}</td><td class="num">${tok(r.usage?.total)}<div class="muted">${usageLine(r.usage)}</div></td><td class="num">${cost(r.usage)}</td></tr>`).join("")}</tbody></table></div></details>`; }).join("")
+      : `<p class="muted" style="margin:0">No Paperclip runs in this period.</p>`;
+    $$("#actPaperclipTasks details.task").forEach(el => el.addEventListener("toggle", () => A.open[el.open ? "add" : "delete"](el.dataset.task)));
+    $("#actPaperclipAgents").innerHTML = pc.by_agent.length ? `<thead><tr><th>Paperclip agent</th><th class="num">Tokens</th><th class="num">In / out</th><th class="num">Cost</th></tr></thead><tbody>${pc.by_agent.map(r => `<tr>
+      <td><b>${esc(r.agent)}</b> <span class="muted">${esc(r.company)} · ${r.runs} run${r.runs > 1 ? "s" : ""}</span></td><td class="num">${tok(r.total)}</td><td class="num muted">${tok(r.input)} / ${tok(r.output)}</td><td class="num">${cost(r)}</td></tr>`).join("")}</tbody>` : "";
+    $("#actPaperclipNote").textContent = !pc.available ? `Paperclip is not answering at ${pc.url}, so its runs cannot be listed.`
+      : `Runs started by Paperclip (${pc.url}), paired with their Hermes sessions by start time.` + (pc.unmatched ? ` ${pc.unmatched} run(s) have no usage recorded.` : "") + ` "unknown" cost means the run used a router model Hermes cannot price.`;
+  }
+  $("#actByProfile").innerHTML = table(d.by_profile, "Agent", r => `<b>${esc(r.profile === "default" ? "manager (default)" : r.profile === "paperclip" ? "Paperclip agents" : r.profile)}</b> <span class="muted">${esc(r.dept)} · ${r.sessions} sessions</span>`);
+  $("#actByModel").innerHTML = table(d.by_model, "Model", r => `<span class="mono">${esc(r.model)}</span>`);
+  $("#actUpdated").textContent = "updated " + new Date(d.now * 1000).toLocaleTimeString();
+}
+async function refreshActivity(quiet) {
+  try { renderActivity(await api(`/api/activity?range=${enc(A.range)}&department=${enc(A.dept)}`)); }
+  catch (e) { if (!quiet) throw e; $("#actUpdated").textContent = "update failed: " + e.message; }
+}
+loaders.activity = async () => {
+  await refreshActivity();
+  clearInterval(A.timer);
+  A.timer = setInterval(() => { if (S.route.view !== "activity") { clearInterval(A.timer); A.timer = null; return; } if (!document.hidden) refreshActivity(true); }, 5000);
+};
+$$("#actRange button").forEach(b => b.onclick = () => { A.range = b.dataset.r; $$("#actRange button").forEach(x => x.setAttribute("aria-pressed", x === b)); refreshActivity().catch(e => toast(e.message, true)); });
+$("#actDept").onchange = e => { A.dept = e.target.value; refreshActivity().catch(err => toast(err.message, true)); };
+// Sidebar "live" dot, even when another page is open.
+setInterval(async () => { if (S.route.view === "activity" || document.hidden) return; try { const d = await api("/api/activity?range=today"); $$("[data-live]").forEach(e => e.hidden = !(d.working ?? d.running.length)); } catch {} }, 20000);
+
+// ================= flow =================
+const F = { timer: null, project: null, data: null, sig: "", seen: null };
+const projectName = w => w ? w.replace(/\/+$/, "").split("/").pop() : "no project folder";
+function flowProjects(d) {
+  const groups = new Map();
+  for (const t of d.tasks) {
+    const key = t.workspace || "";
+    if (!groups.has(key)) groups.set(key, { key, name: projectName(key), tasks: [], direct: [], last: 0, running: 0 });
+    const g = groups.get(key); g.tasks.push(t);
+    g.last = Math.max(g.last, t.created_at || 0, t.started_at || 0, t.completed_at || 0);
+    if (d.running.some(r => r.task_id === t.id)) g.running++;
+  }
+  for (const x of d.direct || []) {
+    const key = x.cwd || "";
+    if (!groups.has(key)) groups.set(key, { key, name: projectName(key), tasks: [], direct: [], last: 0, running: 0 });
+    const g = groups.get(key); g.direct.push(x);
+    g.last = Math.max(g.last, x.started_at || 0, x.ended_at || 0, x.activity_at || 0);
+    if (x.state === "working") g.running++;
+  }
+  return [...groups.values()].sort((a, b) => (b.running - a.running) || (b.last - a.last));
+}
+// Column of a task: one further right than the last task it waits for.
+function flowLevels(tasks) {
+  const byId = Object.fromEntries(tasks.map(t => [t.id, t])), level = {}, busy = new Set();
+  const of = t => {
+    if (level[t.id] != null) return level[t.id];
+    if (busy.has(t.id)) return 0;
+    busy.add(t.id);
+    const ps = t.parents.map(p => byId[p]).filter(Boolean);
+    level[t.id] = ps.length ? 1 + Math.max(...ps.map(of)) : 0;
+    busy.delete(t.id);
+    return level[t.id];
+  };
+  tasks.forEach(of);
+  return level;
+}
+function flowCard(d, t, changed) {
+  const run = d.running.find(r => r.task_id === t.id), [kind, text] = STATUS[t.status] || ["", t.status];
+  // One label per agent turn; the same agent failing several times in a row becomes "backend ✗ ×3".
+  const turns = [];
+  for (const r of t.runs) {
+    const kind = r.status === "running" ? "now" : OUTCOME[r.outcome] || "", prev = turns[turns.length - 1];
+    if (prev && prev.profile === r.profile && prev.kind === kind && kind !== "now") { prev.n++; prev.text = outText(r); }
+    else turns.push({ profile: r.profile, kind, n: 1, text: outText(r) });
+  }
+  const steps = turns.map(x => x.kind === "now" ? `<span class="chip now">${esc(x.profile)} ●</span>`
+    : `<span class="chip ${x.kind}" title="${esc(x.text)}">${esc(x.profile)} ${x.kind === "ok" ? "✓" : x.kind === "bad" ? "✗" : "↺"}${x.n > 1 ? " ×" + x.n : ""}</span>`);
+  const last = t.runs[t.runs.length - 1];
+  if (!run && t.status !== "done" && t.assignee && (!last || last.profile !== t.assignee || t.status !== "blocked")) steps.push(`<span class="chip next">next: ${esc(t.assignee)}</span>`);
+  const foot = run ? `${dur(run.seconds)} · ${friendly(run.activity)}` : t.status === "blocked" ? `Blocked: ${t.blocked_reason || "see details"}`
+    : t.status === "done" ? `finished ${when(t.completed_at)} · ${cost(t.usage)}` : t.parents.length ? "waits for the tasks before it" : "waiting to start";
+  return `<button type="button" class="fcard ${esc(t.status)} ${run ? "working" : ""} ${changed ? "changed" : ""}" data-flow-task="${esc(t.id)}" aria-label="${esc(t.title)}, ${run ? "being worked on by " + run.profile : text}">
+    <span class="row">${run ? chip("ok", "working now") : chip(kind, text)}<span class="mono muted">${esc(t.id)}</span></span>
+    <b>${esc(t.title)}</b><span class="steps">${steps.join("<i>→</i>")}</span><span class="foot ${t.status === "blocked" && !run ? "bad" : ""}">${esc(foot)}</span></button>`;
+}
+function directCard(x) {
+  const [kind, text] = DIRECT_STATE[x.state];
+  const foot = x.state === "working" ? `${dur(x.seconds)} · ${friendly(x.activity)}` : x.state === "open" ? `open for ${dur(x.seconds)} · ${x.messages ?? 0} messages`
+    : `${when(x.started_at)} · ${dur(x.seconds)} · ${tok(x.usage?.total)} tokens · ${cost(x.usage)}`;
+  return `<div class="fcard ${x.state === "working" ? "working" : x.state === "ended" ? "done" : "review"}" data-direct="${esc(x.id)}">
+    <span class="row">${chip(kind, text)}<span class="muted">${esc(SOURCE[x.source] || x.source)}</span></span>
+    <b>${esc(directTitle(x))}</b><span class="steps"><span class="chip ${x.state === "working" ? "now" : x.state === "ended" ? "ok" : ""}">${esc(x.role)}${x.state === "working" ? " ●" : ""}</span></span>
+    <span class="foot">${esc(foot)}</span></div>`;
+}
+function drawFlowLines() {
+  const graph = $("#flowGraph"), svg = graph.querySelector("svg"); if (!svg || !F.data) return;
+  const box = graph.getBoundingClientRect(), d = F.data, byId = Object.fromEntries(d.tasks.map(t => [t.id, t]));
+  const paths = [];
+  graph.querySelectorAll("[data-flow-task]").forEach(el => {
+    const t = byId[el.dataset.flowTask], to = el.getBoundingClientRect();
+    for (const pid of t.parents) {
+      const from = graph.querySelector(`[data-flow-task="${CSS.escape(pid)}"]`)?.getBoundingClientRect(); if (!from) continue;
+      const x1 = from.right - box.left, y1 = from.top + from.height / 2 - box.top, x2 = to.left - box.left, y2 = to.top + to.height / 2 - box.top, bend = Math.max(24, (x2 - x1) / 2);
+      const cls = d.running.some(r => r.task_id === t.id) ? "live" : byId[pid].status === "blocked" ? "stuck" : byId[pid].status === "done" ? "passed" : "";
+      paths.push(`<path class="${cls}" d="M${x1} ${y1} C${x1 + bend} ${y1} ${x2 - bend} ${y2} ${x2} ${y2}"/>`);
+    }
+  });
+  svg.innerHTML = paths.join("");
+}
+function renderFlow(d) {
+  F.data = d; O.data = d;
+  const projects = flowProjects(d), follow = $("#flowFollow").checked;
+  $$("[data-live]").forEach(e => e.hidden = !(d.working ?? d.running.length));
+  $("#flowUpdated").textContent = "updated " + new Date(d.now * 1000).toLocaleTimeString();
+  const blocked = d.tasks.filter(t => t.status === "blocked");
+  const dw = directWorking(d);
+  $("#flowNow").innerHTML = d.running.length || dw.length ? dw.map(x => `<div class="line"><span class="dot ok pulse"></span><span><b>${esc(x.role)}</b> is working with you on “${esc(directTitle(x))}”</span>
+      <span class="muted">${esc(folderName(x.cwd) || "no folder")} · ${dur(x.seconds)} · ${esc(friendly(x.activity))} · ${tok(x.usage?.total)} tokens</span></div>`).join("") + d.running.map(r => `<div class="line"><span class="dot ok pulse"></span><span><b>${esc(r.profile)}</b> is working on “${esc(r.title)}”</span>
+      <span class="muted">${esc(projectName((d.tasks.find(t => t.id === r.task_id) || {}).workspace))} · ${dur(r.seconds)} · ${esc(friendly(r.activity))} · ${tok(r.usage?.total)} tokens</span></div>`).join("")
+    : `<div class="line"><span class="dot"></span><b>No agent is working right now.</b>${blocked.length ? `<span class="bad">${blocked.length} task${blocked.length === 1 ? " is" : "s are"} blocked${blocked[0].blocked_reason ? ": " + esc(blocked[0].blocked_reason) : ""}</span>` : `<span class="muted">Ask a lead for work, for example with <span class="mono">hermes</span>.</span>`}</div>`;
+  if (!projects.length) { $("#flowProjects").innerHTML = ""; $("#flowGraph").innerHTML = `<p class="muted" style="margin:0">No tasks yet.</p>`; F.sig = ""; return; }
+  if ((follow && projects[0].running) || !projects.some(p => p.key === F.project)) F.project = projects[0].key;
+  const proj = projects.find(p => p.key === F.project);
+  $("#flowProjects").innerHTML = projects.slice(0, 8).map(p => `<button type="button" data-project="${esc(p.key)}" aria-pressed="${p.key === F.project}" title="${esc(p.key)}">${p.running ? "● " : ""}${esc(p.name)} <span class="muted">${p.tasks.length + p.direct.length}</span></button>`).join("");
+  $$("#flowProjects button").forEach(b => b.onclick = () => { F.project = b.dataset.project; $("#flowFollow").checked = false; F.sig = ""; renderFlow(F.data); });
+
+  // Redraw the boxes only when something changed, so the flashing does not restart on every refresh.
+  const state = {}; for (const t of proj.tasks) state[t.id] = [t.status, t.assignee, t.runs.length, (t.runs[t.runs.length - 1] || {}).status, t.blocked_reason].join("|");
+  for (const x of proj.direct) state["d:" + x.id] = [x.state, x.title, x.messages].join("|");
+  const sig = F.project + JSON.stringify(state);
+  if (sig !== F.sig) {
+    const prev = F.sig.startsWith(F.project + "{") ? F.seen : null;
+    const level = flowLevels(proj.tasks), cols = [];
+    for (const t of proj.tasks.slice().sort((a, b) => (a.created_at || 0) - (b.created_at || 0))) (cols[level[t.id]] ||= []).push(t);
+    $("#flowGraph").innerHTML = `<svg class="flow-lines" aria-hidden="true"></svg><div class="flow-cols">${cols.map((col, i) => `<div class="flow-col"><span class="step">Step ${i + 1}</span>${
+      col.map(t => flowCard(d, t, prev && prev[t.id] !== state[t.id])).join("")}</div>`).join("")}${
+      proj.direct.length ? `<div class="flow-col"><span class="step">Direct work with you</span>${proj.direct.slice(0, 12).map(directCard).join("")}</div>` : ""}</div>`;
+    $$("#flowGraph [data-flow-task]").forEach(el => el.onclick = () => openTask(el.dataset.flowTask));
+    F.sig = sig; F.seen = state;
+    $("#flowGraph .working")?.scrollIntoView({ block: "nearest", inline: "center" });
+  } else {
+    for (const x of proj.direct) if (x.state !== "ended") { const foot = $(`#flowGraph [data-direct="${CSS.escape(x.id)}"] .foot`); if (foot) foot.textContent = x.state === "working" ? `${dur(x.seconds)} · ${friendly(x.activity)}` : `open for ${dur(x.seconds)} · ${x.messages ?? 0} messages`; }
+    for (const r of d.running) { const foot = $(`#flowGraph [data-flow-task="${CSS.escape(r.task_id)}"] .foot`); if (foot) foot.textContent = `${dur(r.seconds)} · ${friendly(r.activity)}`; }
+  }
+  drawFlowLines();
+}
+async function refreshFlow(quiet) {
+  try { renderFlow(await api("/api/activity?range=today")); }
+  catch (e) { if (!quiet) throw e; $("#flowUpdated").textContent = "update failed: " + e.message; }
+}
+loaders.flow = async () => {
+  F.sig = "";
+  await refreshFlow();
+  clearInterval(F.timer);
+  F.timer = setInterval(() => { if (S.route.view !== "flow") { clearInterval(F.timer); F.timer = null; return; } if (!document.hidden && !$("#agentDialog").open) refreshFlow(true); }, 4000);
+};
+$("#flowFollow").onchange = () => { F.sig = ""; if (F.data) renderFlow(F.data); };
+window.addEventListener("resize", () => { if (S.route.view === "flow") drawFlowLines(); });
+
+// ================= office =================
+const O = { timer: null, seen: null, data: null, flying: 0 };
+const ROLE_ICON = { manager: "👔", backend: "⚙️", frontend: "🎨", debugger: "🐞", security: "🛡️", reviewer: "🔍", tester: "🧪", shell: "⌨️", architect: "📐", hardware: "🔧" };
+const iconFor = a => ROLE_ICON[a.role] || (/lead/.test(a.role) ? "👔" : /review|qa/.test(a.role) ? "🔍" : /design/.test(a.role) ? "🎨" : /firmware|backend/.test(a.role) ? "⚙️" : /schematic|layout|mech/.test(a.role) ? "📐" : /research|docs/.test(a.role) ? "📚" : "🧑‍💻");
+const hue = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+const person = a => { const h = hue(a.profile); return `<svg width="90" height="84" viewBox="0 0 90 84" aria-hidden="true">
+  <text class="zz" x="62" y="14">z z</text>
+  <g class="head"><circle cx="45" cy="26" r="11" fill="hsl(${h} 45% 72%)"/><path d="M34 24a11 11 0 0 1 22 0q-11-7-22 0" fill="hsl(${(h + 40) % 360} 35% 28%)"/><circle cx="41" cy="27" r="1.3" fill="#222"/><circle cx="49" cy="27" r="1.3" fill="#222"/></g>
+  <rect x="33" y="38" width="24" height="22" rx="7" fill="hsl(${h} 55% 48%)"/>
+  <rect class="arm-l" x="27" y="44" width="9" height="16" rx="4" fill="hsl(${h} 55% 42%)"/><rect class="arm-r" x="54" y="44" width="9" height="16" rx="4" fill="hsl(${h} 55% 42%)"/>
+  <rect x="8" y="60" width="74" height="7" rx="3" fill="#8a6f4d"/><rect x="14" y="67" width="5" height="15" fill="#6f5839"/><rect x="71" y="67" width="5" height="15" fill="#6f5839"/>
+  <rect x="31" y="42" width="28" height="18" rx="2" fill="#1d212b"/><rect class="screen" x="33" y="44" width="24" height="14" rx="1"/><rect x="42" y="60" width="6" height="2" fill="#1d212b"/></svg>`; };
+const friendly = t => !t ? "starting…" : /stream|response|api/i.test(t) ? "thinking…" : /tool|exec|terminal|command/i.test(t) ? "running a tool…" : t;
+const paper = (t, extra = "") => `<button class="paper ${esc(t.status)} ${extra}" data-paper="${esc(t.id)}" title="${esc(t.title)} (${esc(t.status)})" aria-label="Task ${esc(t.title)}, ${esc(t.status)}"></button>`;
+
+function agentState(d, a) {
+  const live = directWorking(d).find(x => x.profile === a.profile);
+  const run = d.running.find(r => r.profile === a.profile) || (live && { ...live, task_id: "", title: directTitle(live) + (live.cwd ? ` (${folderName(live.cwd)})` : "") });
+  const mine = d.tasks.filter(t => t.assignee === a.profile);
+  const queue = mine.filter(t => ["ready", "todo", "blocked", "review", "scheduled", "triage"].includes(t.status));
+  const failed = queue.find(t => t.status === "blocked" && t.runs.some(r => ["crashed", "timed_out", "gave_up"].includes(r.outcome)));
+  return { run, queue, failed, mine };
+}
+function renderOffice(d) {
+  O.data = d;
+  const byDept = {};
+  for (const a of d.agents) (byDept[a.dept] ||= []).push(a);
+  const leadFirst = (x, y) => (/^(manager)$|lead/.test(y.role) - /^(manager)$|lead/.test(x.role));
+  $("#office").innerHTML = d.departments.filter(dep => byDept[dep.name]).map(dep => {
+    const agents = byDept[dep.name].slice().sort(leadFirst), working = agents.filter(a => d.running.some(r => r.profile === a.profile) || directWorking(d).some(x => x.profile === a.profile)).length;
+    return `<div class="room ${working ? "busy" : ""}"><header><b>${esc(dep.title)}</b>${working ? chip("ok", `${working} working`) : chip("", "quiet")}<span class="grow"></span><span class="muted">${agents.filter(a => a.installed).length} agents</span></header>
+      <div class="floor">${agents.map(a => { const st = agentState(d, a);
+        const cls = !a.installed || !a.enabled ? "off" : st.run ? "work" : st.failed ? "stuck" : "idle";
+        const quiet = st.run?.activity_at ? d.now - st.run.activity_at : 0;
+        const bubble = st.run ? `<span class="bubble ${quiet > 120 ? "warn" : ""}">${esc(quiet > 120 ? "quiet " + dur(Math.round(quiet)) : friendly(st.run.activity))}</span>` : st.failed ? `<span class="bubble bad">${esc(CAUSE[st.failed.cause] || "stuck")}</span>` : !a.installed ? `<span class="bubble">not hired yet</span>` : !a.enabled ? `<span class="bubble">off duty</span>` : "";
+        return `<div class="desk ${cls}" role="button" tabindex="0" data-agent="${esc(a.profile)}" aria-label="${esc(a.role)}, ${st.run ? "working" : cls}">
+          ${bubble}${person(a)}<span class="who">${iconFor(a)} ${esc(a.role)}</span><span class="model">${esc(shortModel(st.run?.model || a.model))}</span>
+          <span class="stack">${st.run && st.run.task_id ? paper({ id: st.run.task_id, title: st.run.title, status: "running" }) : ""}${st.queue.slice(0, 6).map(t => paper(t)).join("")}</span></div>`; }).join("")}</div></div>`; }).join("");
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const unassigned = d.tasks.filter(t => !t.assignee && t.status !== "done");
+  const done = d.tasks.filter(t => t.status === "done" && (t.completed_at || 0) * 1000 >= today.getTime());
+  $("#officeInbox").innerHTML = unassigned.length ? unassigned.slice(0, 8).map(t => paper(t)).join("") : `<span class="muted">empty</span>`;
+  $("#officeDone").innerHTML = done.length ? done.slice(0, 12).map(t => paper(t)).join("") + (done.length > 12 ? ` <span class="muted">+${done.length - 12}</span>` : "") : `<span class="muted">nothing yet today</span>`;
+  const c = d.counts;
+  $("#officeStatus").textContent = `${d.working ?? d.running.length} working · ${(c.ready || 0) + (c.todo || 0)} waiting · ${c.blocked || 0} blocked · ${c.done || 0} done · updated ${new Date(d.now * 1000).toLocaleTimeString()}`;
+  $$("[data-live]").forEach(e => e.hidden = !(d.working ?? d.running.length));
+  $$("#office .desk").forEach(el => { el.onclick = e => { if (!e.target.closest("[data-paper]")) openAgent(el.dataset.agent); }; el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAgent(el.dataset.agent); } }; });
+  $$('[data-view="office"] [data-paper]').forEach(el => el.onclick = e => { e.stopPropagation(); openTask(el.dataset.paper); });
+  animateArrivals(d);
+}
+// A paper flies from the inbox door to the desk when a run starts, and from the desk to Done when a task finishes.
+function animateArrivals(d) {
+  const state = {}; for (const t of d.tasks) state[t.id] = t.status + "|" + (d.running.find(r => r.task_id === t.id)?.profile || "");
+  const prev = O.seen; O.seen = state;
+  if (!prev || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  for (const t of d.tasks) {
+    if (prev[t.id] === state[t.id]) continue;
+    const run = d.running.find(r => r.task_id === t.id);
+    if (run) fly($("#officeDoor"), $(`#office .desk[data-agent="${CSS.escape(run.profile)}"]`), "");
+    else if (t.status === "done") fly($(`#office .desk[data-agent="${CSS.escape(t.runs.at(-1)?.profile || t.assignee || "")}"]`), $("#officeDone"), "done");
+    else if (t.status === "blocked" && prev[t.id]) toast(`Task blocked: ${t.title}`, true);
+  }
+}
+function fly(from, to, cls) {
+  if (!from || !to || O.flying > 6) return;
+  const a = from.getBoundingClientRect(), b = to.getBoundingClientRect(), el = document.createElement("div");
+  el.className = "paper fly " + cls; document.body.append(el); O.flying++;
+  const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2, x1 = b.left + b.width / 2, y1 = b.top + b.height / 2;
+  el.animate([{ transform: `translate(${x0}px, ${y0}px) rotate(0) scale(1.4)` }, { transform: `translate(${(x0 + x1) / 2}px, ${Math.min(y0, y1) - 60}px) rotate(200deg) scale(1.8)`, offset: .5 }, { transform: `translate(${x1}px, ${y1}px) rotate(360deg) scale(1)` }],
+    { duration: 1100, easing: "ease-in-out" }).onfinish = () => { el.remove(); O.flying--; };
+  el.style.left = "0"; el.style.top = "0";
+}
+const AG = { profile: null, tab: "status", sid: "", job: null, poll: null, log: [] };
+const remembered = (k, v) => { try { if (v === undefined) return localStorage.getItem(k) || ""; localStorage.setItem(k, v); } catch {} return v || ""; };
+function openAgent(profile, tab) {
+  const a = O.data?.agents.find(x => x.profile === profile); if (!a) return;
+  if (AG.profile !== profile) { clearInterval(AG.poll); Object.assign(AG, { profile, sid: "", job: null, poll: null, log: [] }); }
+  AG.tab = tab || (AG.profile === profile && AG.tab) || "status";
+  renderAgent();
+  if (!$("#agentDialog").open) $("#agentDialog").showModal();
+}
+function renderAgent() {
+  const d = O.data, a = d.agents.find(x => x.profile === AG.profile), st = agentState(d, a);
+  $("#agTitle").textContent = `${iconFor(a)} ${a.role}`;
+  const can = a.installed && a.enabled, locked = a.role === "manager" || /lead$/.test(a.role);
+  $("#agBody").innerHTML = `
+    <p class="row">${st.run ? chip("ok", "working now") : !a.installed ? chip("", "not applied to Hermes yet") : !a.enabled ? chip("", "disabled") : st.failed ? chip("bad", st.failed.cause ? "stopped: " + (CAUSE[st.failed.cause] || st.failed.cause) : "stuck on a task") : chip("", "idle")}${chip("", a.dept)}<span class="mono muted">${esc(a.model || "?")}</span>
+      <span class="grow"></span><label class="switch" title="${locked ? "This agent runs its department and cannot be switched off" : "A disabled agent gets no tasks and cannot be chatted with"}"><input type="checkbox" id="agEnabled" ${a.enabled ? "checked" : ""} ${locked ? "disabled" : ""}> <span>${a.enabled ? "Enabled" : "Disabled"}</span></label></p>
+    <div class="seg" role="tablist" style="margin-bottom:12px">${[["status", "Status"], ["chat", "Chat"], ["task", "Give task"]].map(([k, l]) => `<button role="tab" data-agtab="${k}" aria-pressed="${AG.tab === k}">${l}</button>`).join("")}</div>
+    <div id="agPane"></div>`;
+  $$("#agBody [data-agtab]").forEach(b => b.onclick = () => { AG.tab = b.dataset.agtab; renderAgent(); });
+  $("#agEnabled").onchange = async e => {
+    const on = e.target.checked;
+    if (!on && !await ask(`Disable ${a.role}? It will get no new tasks, its waiting tasks are put on hold, and you cannot chat with it until you enable it again.`)) { e.target.checked = true; return; }
+    try { const r = await api(`/api/agents/${enc(a.profile)}/enabled`, { method: "POST", body: { enabled: on } }); toast(`${a.role} ${on ? "enabled" : "disabled"}. ${r.note}`); await refreshOffice(true); renderAgent(); loadCompany(true).catch(() => {}); }
+    catch (err) { e.target.checked = !on; toast(err.message, true); }
+  };
+  const pane = $("#agPane");
+  if (AG.tab === "status") paneStatus(pane, d, a, st);
+  else if (!can) pane.innerHTML = `<p class="muted">${a.installed ? "This agent is disabled. Switch it on above to chat with it or give it a task." : "This agent has no Hermes profile yet. Apply its department first."}</p>`;
+  else if (AG.tab === "chat") paneChat(pane, a);
+  else paneTask(pane, a);
+}
+function paneStatus(pane, d, a, st) {
+  const profile = a.profile, u = d.by_profile.find(x => x.profile === profile);
+  const runs = d.tasks.flatMap(t => t.runs.filter(r => r.profile === profile).map(r => ({ ...r, task: t }))).sort((x, y) => (y.started_at || 0) - (x.started_at || 0)).slice(0, 8);
+  pane.innerHTML = `
+    ${st.run ? `<div class="card" style="margin:0 0 10px"><b>${esc(st.run.title)}</b> <span class="mono muted">${esc(st.run.task_id)}</span>
+      <p style="margin:6px 0">Doing: <b>${esc(st.run.activity || "starting")}</b>${st.run.activity_at && d.now - st.run.activity_at > 120 ? ` <span class="warn">(quiet for ${dur(Math.round(d.now - st.run.activity_at))})</span>` : ""}</p>
+      <p class="muted" style="margin:0">Running ${dur(st.run.seconds)} · ${st.run.tool_calls ?? 0} tool calls · ${st.run.usage?.api_calls ?? 0} model calls · <b>${tok(st.run.usage?.total)}</b> tokens (${usageLine(st.run.usage)}) · ${cost(st.run.usage)}</p>
+      ${st.run.task_id ? `<p style="margin:8px 0 0"><button class="btn" data-open-task="${esc(st.run.task_id)}">Open task</button></p>` : `<p class="muted" style="margin:8px 0 0">Direct session, not a board task.</p>`}</div>` : `<p class="muted">Not working on a board task right now.</p>`}
+    <p><b>Today</b>: ${u ? `${tok(u.total)} tokens (in ${tok(u.input)} · out ${tok(u.output)}) · ${cost(u)} · ${u.sessions} sessions` : "no activity"}</p>
+    ${st.queue.length ? `<p><b>On the desk</b></p><table><tbody>${st.queue.map(t => `<tr><td>${chip((STATUS[t.status] || [""])[0], (STATUS[t.status] || [0, t.status])[1])}</td><td><a href="#" data-open-task="${esc(t.id)}">${esc(t.title)}</a>${t.blocked_reason ? `<div class="muted">${esc(t.blocked_reason.slice(0, 140))}</div>` : ""}</td></tr>`).join("")}</tbody></table>` : ""}
+    ${runs.length ? `<p><b>Recent work</b></p><table><thead><tr><th>Task</th><th>Result</th><th>When</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead><tbody>${runs.map(r => `<tr><td><a href="#" data-open-task="${esc(r.task.id)}">${esc(r.task.title)}</a></td><td class="${OUTCOME[r.outcome] || ""}">${esc(outText(r))}</td><td class="muted">${when(r.started_at)}</td><td class="num">${tok(r.usage?.total)}</td><td class="num">${cost(r.usage)}</td></tr>`).join("")}</tbody></table>` : ""}`;
+  $$("#agPane [data-open-task]").forEach(b => b.onclick = e => { e.preventDefault(); openTask(b.dataset.openTask); });
+}
+// ---- chat with one agent: it works directly, without the manager or the task board ----
+function chatLine() {
+  const j = AG.job; if (!j || j.state !== "running") return "";
+  const secs = Math.round(Date.now() / 1000 - j.started_at);
+  return `<div class="msg assistant wait">${esc(friendly(j.activity))} ${dur(secs)}${j.usage?.total ? ` · ${tok(j.usage.total)} tokens · ${cost(j.usage)}` : ""}${j.tool_calls ? ` · ${j.tool_calls} tool calls` : ""}</div>`;
+}
+function drawChat() {
+  const log = $("#chatLog"); if (!log) return;
+  log.innerHTML = (AG.log.length ? AG.log.map(m => `<div class="msg ${m.role === "user" ? "user" : "assistant"} ${m.error ? "err" : ""}">${esc(m.text || "")}${m.error ? `${m.text ? "\n\n" : ""}⚠ ${esc(m.error)}` : ""}</div>`).join("") : `<p class="muted" style="margin:auto">Say what you need. This agent does the work itself, with its own tools.</p>`) + chatLine();
+  log.scrollTop = log.scrollHeight;
+  const busy = AG.job?.state === "running";
+  $("#chatSend").disabled = busy; $("#chatStop").hidden = !busy;
+}
+async function paneChat(pane, a) {
+  pane.innerHTML = `<div class="row" style="margin-bottom:8px"><select id="chatSession" style="width:auto;max-width:60%" aria-label="Conversation"><option value="">New conversation</option></select>
+      <input id="chatFolder" class="grow mono" placeholder="project folder (optional), e.g. ~/Projects/CallAgent" value="${esc(remembered("folder:" + a.profile))}" aria-label="Project folder"></div>
+    <div class="chatlog" id="chatLog" aria-live="polite"></div>
+    <form class="chatform" id="chatForm" style="margin-top:8px"><textarea id="chatText" placeholder="Message ${esc(a.role)}…  (Enter to send, Shift+Enter for a new line)" required></textarea>
+      <div class="row" style="margin-top:6px"><span class="muted grow">Uses ${esc(a.role)}'s own API key. Each message costs at least a few cents on expensive models.</span><button class="btn danger" type="button" id="chatStop" hidden>Stop</button><button class="btn primary" id="chatSend">Send</button></div></form>`;
+  drawChat();
+  try {
+    const s = await api(`/api/agents/${enc(a.profile)}/sessions`);
+    $("#chatSession").innerHTML = `<option value="">New conversation</option>` + s.sessions.map(x => `<option value="${esc(x.id)}">${esc(x.title || x.id)} · ${when(x.updated_at)}</option>`).join("");
+    $("#chatSession").value = AG.sid;
+  } catch {}
+  $("#chatSession").onchange = async e => {
+    AG.sid = e.target.value; AG.log = [];
+    if (AG.sid) try { AG.log = (await api(`/api/agents/${enc(a.profile)}/sessions/${enc(AG.sid)}`)).messages; } catch (err) { toast(err.message, true); }
+    drawChat();
+  };
+  $("#chatText").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#chatForm").requestSubmit(); } };
+  $("#chatStop").onclick = () => AG.job && api(`/api/agents/chat/${AG.job.id}/stop`, { method: "POST" }).then(() => toast("Stopping…")).catch(err => toast(err.message, true));
+  $("#chatForm").onsubmit = async e => {
+    e.preventDefault();
+    const text = $("#chatText").value.trim(), folder = $("#chatFolder").value.trim(); if (!text || AG.job?.state === "running") return;
+    remembered("folder:" + a.profile, folder);
+    try { AG.job = await api(`/api/agents/${enc(a.profile)}/chat`, { method: "POST", body: { message: text, session_id: AG.sid, folder } }); }
+    catch (err) { toast(err.message, true); return; }
+    AG.log.push({ role: "user", text }); $("#chatText").value = ""; drawChat();
+    clearInterval(AG.poll);
+    AG.poll = setInterval(async () => {
+      let j; try { j = await api(`/api/agents/chat/${AG.job.id}`); } catch (err) { j = { ...AG.job, state: "error", error: err.message }; }
+      AG.job = j; if (j.session_id) AG.sid = j.session_id;
+      if (j.state !== "running") { clearInterval(AG.poll); AG.log.push({ role: "assistant", text: j.reply || "", error: j.error }); }
+      drawChat();
+    }, 1500);
+  };
+  $("#chatText").focus();
+}
+function paneTask(pane, a) {
+  pane.innerHTML = `<form id="taskForm"><p class="muted" style="margin-top:0">One task on the board, for ${esc(a.role)} only. The manager is not involved and nothing is split up. You can follow it in Office and Activity.</p>
+    <p><label>Title<br><input name="title" required maxlength="160" placeholder="e.g. Fix the reconnect bug in signaling.js"></label></p>
+    <p><label>What to do<br><textarea name="body" style="min-height:120px;font-family:inherit;font-size:14px" placeholder="Goal, files, what done looks like, how to test it"></textarea></label></p>
+    <p><label>Project folder (optional)<br><input name="folder" class="mono" placeholder="~/Projects/…" value="${esc(remembered("folder:" + a.profile))}"></label></p>
+    <div class="row">${a.dept === "software" ? `<label class="switch"><input type="checkbox" name="review"> <span>Send to the reviewer when done</span></label>` : ""}
+      <label class="row" style="gap:6px">Time limit <input name="timeout" type="number" min="5" max="240" value="45" style="width:80px"> min</label><span class="grow"></span><button class="btn primary">Give task</button></div></form>`;
+  $("#taskForm").onsubmit = async e => {
+    e.preventDefault(); const f = new FormData(e.target);
+    remembered("folder:" + a.profile, f.get("folder"));
+    try {
+      const r = await api(`/api/agents/${enc(a.profile)}/task`, { method: "POST", body: { title: f.get("title"), body: f.get("body"), folder: f.get("folder"), review: f.get("review") === "on", timeout_minutes: Number(f.get("timeout")) || 45 } });
+      toast(`Task ${r.task_id} given to ${a.role}`); $("#agentDialog").close(); refreshOffice(true);
+    } catch (err) { toast(err.message, true); }
+  };
+}
+function openTask(id) {
+  const t = O.data.tasks.find(x => x.id === id); if (!t) return;
+  const [kind, text] = STATUS[t.status] || ["", t.status];
+  $("#agTitle").textContent = `📄 ${t.title}`;
+  $("#agBody").innerHTML = `<p class="row">${chip(kind, text)}<span class="mono muted">${esc(t.id)}</span><span class="muted">assigned to ${esc(t.assignee || "nobody")}</span><span class="grow"></span><b>${tok(t.usage.total)} tokens · ${cost(t.usage)}</b></p>
+    ${t.blocked_reason ? `<p class="bad">Blocked: ${esc(t.blocked_reason)}</p>` : ""}
+    <p class="muted">Created ${when(t.created_at)} by ${esc(t.created_by || "?")} · ${t.completed_at ? "finished " + when(t.completed_at) : "not finished"}</p>
+    ${t.runs.length ? `<table><thead><tr><th>Agent</th><th>Model</th><th>Result</th><th>Took</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead><tbody>${t.runs.map(r => `<tr><td><a href="#" data-open-agent="${esc(r.profile)}">${esc(r.profile)}</a></td><td class="mono">${esc(shortModel(r.model))}</td><td class="${OUTCOME[r.outcome] || ""}">${esc(outText(r))}</td><td>${dur(r.seconds)}</td><td class="num">${tok(r.usage?.total)}</td><td class="num">${cost(r.usage)}</td></tr>`).join("")}</tbody></table>` : `<p class="muted">Nobody has started this yet.</p>`}
+    ${t.summary ? `<p><b>Result</b></p><pre>${esc(t.summary)}</pre>` : ""}
+    ${t.body ? `<details><summary class="muted">Task description</summary><pre>${esc(t.body)}</pre></details>` : ""}`;
+  $$("#agBody [data-open-agent]").forEach(b => b.onclick = e => { e.preventDefault(); openAgent(b.dataset.openAgent); });
+  if (!$("#agentDialog").open) $("#agentDialog").showModal();
+}
+async function refreshOffice(quiet) {
+  try { renderOffice(await api("/api/activity?range=today")); }
+  catch (e) { if (!quiet) throw e; $("#officeStatus").textContent = "update failed: " + e.message; }
+}
+loaders.office = async () => {
+  await refreshOffice();
+  clearInterval(O.timer);
+  O.timer = setInterval(() => { if (S.route.view !== "office") { clearInterval(O.timer); O.timer = null; return; } if (!document.hidden && !$("#agentDialog").open) refreshOffice(true); }, 4000);
+};
+
+function openNewDept() { $("#ndError").textContent = ""; $("#newDeptForm").reset(); $("#newDeptDialog").showModal(); }
+$("#addDeptNav").onclick = openNewDept;
+$("#ndTitle").addEventListener("input", () => {
+  const slug = $("#ndTitle").value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  $("#ndName").value = slug; $("#ndPrefix").value = slug.replace(/-/g, "").slice(0, 3);
+});
+$("#newDeptForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  try {
+    const r = await api("/api/departments", { method: "POST", body: { name: $("#ndName").value.trim(), title: $("#ndTitle").value.trim(), prefix: $("#ndPrefix").value.trim() } });
+    $("#newDeptDialog").close(); await loadCompany(true);
+    location.hash = `#/d/${enc(r.created)}/team`; toast("Department created - describe its roles, then apply");
+  } catch (err) { $("#ndError").textContent = err.message; }
+});
+
+const STATUS_CLASS = { done: "ok", running: "warn", review: "warn", blocked: "bad" };
+const boardRows = (tasks, empty) => tasks.length ? tasks.map(t => `<tr><td><span class="mono muted">${esc(t.id)}</span> ${esc(t.title)}</td><td>${esc(t.assignee || "–")}</td><td class="${STATUS_CLASS[t.status] || ""}">${esc(t.status)}</td><td class="hide-sm muted">${t.created_at ? new Date(t.created_at * 1000).toLocaleString() : ""}</td></tr>`).join("") : `<tr><td colspan="4" class="muted">${esc(empty)}</td></tr>`;
+// ---- rules editor: a department's policies and role rules ----
+let RULES = null, currentRules = {};
+async function openRulesEditor(cfg) {
+  RULES = cfg; $("#rulesLead").innerHTML = cfg.lead;
+  const list = await api(cfg.list);
+  let last = null;
+  $("#policyList").innerHTML = list.map(p => `${p.kind && p.kind !== last ? `<div class="group">${esc(last = p.kind)}</div>` : ""}<button data-p="${esc(p.path)}">${esc(cfg.label(p.path))} <span class="muted">${p.chars}</span></button>`).join("");
+  $("#policyList").querySelectorAll("button").forEach(b => b.addEventListener("click", () => openRules(b.dataset.p)));
+  const wanted = currentRules[cfg.id];
+  openRules(list.some(p => p.path === wanted) ? wanted : list[0]?.path);
+}
+async function openRules(path) {
+  if (!path) { $("#policyName").textContent = ""; $("#policyText").value = ""; return; }
+  currentRules[RULES.id] = path;
   $("#policyList").querySelectorAll("button").forEach(b => b.setAttribute("aria-current", b.dataset.p === path));
-  const p = await api("/api/policies/" + path);
-  $("#policyName").textContent = "policies/" + path; $("#policyText").value = p.text; countChars();
+  const p = await api(RULES.item(path));
+  $("#policyName").textContent = RULES.prefix + path; $("#policyText").value = p.text; countChars();
 }
 function countChars() { const n = $("#policyText").value.length; $("#policyChars").textContent = n + " chars"; $("#policyChars").className = n > 4000 ? "warn" : "muted"; }
 $("#policyText").addEventListener("input", countChars);
 $("#policySave").addEventListener("click", async () => {
-  try { await api("/api/policies/" + currentPolicy, { method: "PUT", body: { text: $("#policyText").value } }); toast("Saved - go to Apply"); refreshPending(); }
+  const path = currentRules[RULES.id]; if (!path) return;
+  try { await api(RULES.item(path), { method: "PUT", body: { text: $("#policyText").value } }); toast("Saved - go to Apply"); await RULES.saved(); }
   catch (e) { toast(e.message, true); }
 });
-
-// ---- keys ----
-loaders.keys = async () => {
-  $("#keyTable tbody").innerHTML = `<tr><td colspan="6" class="muted">Checking keys with OpenRouter…</td></tr>`;
-  const keys = await api("/api/keys");
-  let used = 0, limit = 0;
-  $("#keyTable tbody").innerHTML = keys.map(k => {
-    used += k.usage || 0; limit += k.limit || 0;
-    const pct = k.limit ? Math.min(100, (k.usage || 0) / k.limit * 100) : 0;
-    const status = !k.masked ? `<span class="muted">empty</span>` : k.valid ? `<span class="ok">valid</span> <span class="muted mono">${esc(k.masked)}</span>` : `<span class="bad">invalid</span>`;
-    return `<tr><td class="mono">${esc(k.name.replace("OPENROUTER_KEY_", ""))}</td><td>${status}</td>
-      <td>${k.valid ? money(k.usage) + " / " + (k.limit == null ? "no limit" : "$" + k.limit) : "–"}</td>
-      <td>${k.valid && k.limit ? `<div class="bar"><i class="${pct > 90 ? "full" : pct > 70 ? "hi" : ""}" style="width:${pct}%"></i></div>` : ""}</td>
-      <td class="muted">${esc(k.reset || "")}</td><td><button class="btn" data-key="${esc(k.name)}">Replace</button></td></tr>`;
+async function refreshPending() {
+  const p = await api("/api/pending");
+  S.swPending = !!p.diff;
+  $$("[data-sw-pending]").forEach(b => b.hidden = !S.swPending);
+  return p;
+}
+// ================= departments (software, and the engine's) =================
+const deptUrl = (rest = "") => `/api/departments/${enc(S.dept)}${rest}`;
+async function loadDept(force) {
+  const name = routeDept(S.route);
+  await loadCompany();
+  if (S.dept !== name || !S.d || force || (name === "software" && !draftDirty())) {
+    const d = await api(`/api/departments/${enc(name)}`);
+    S.dept = name; S.d = d; S.draft = clone(d.config);
+    $("#dApplyLog").textContent = "Nothing applied in this session yet.";
+    loadDeptModels(false);
+  }
+  $$("[data-dept-file]").forEach(e => e.textContent = S.d.file || `departments/${name}/department.json`);
+}
+function setDeptState(d) { S.d = d; S.draft = clone(d.config); updateSaveBar(); renderHead(); (S.dept === "software" ? refreshPending() : loadCompany(true)).catch(() => {}); }
+async function loadDeptModels(refresh) {
+  try {
+    const data = await api(`/api/dept-models?dept=${enc(S.dept === "software" ? "" : S.dept || "")}${refresh ? "&refresh=true" : ""}`);
+    S.models = data.models; S.bench = data.benchmarks || {}; S.modelIndex = Object.fromEntries(data.models.map(m => [m.id, m]));
+    $("#deptModelList").innerHTML = data.models.map(m => `<option value="${esc(m.id)}">${usd(m.price_in)} / ${usd(m.price_out)}${m.image ? " · images" : ""}${m.pdf ? " · PDF" : ""}</option>`).join("");
+    $("#modelsAge").textContent = data.fetched_at ? "Prices from OpenRouter, " + new Date(data.fetched_at * 1000).toLocaleDateString() : "Model list not loaded";
+    if (data.stale_reason) toast(data.stale_reason, true);
+    if (editing() && S.route.tab === "team") refreshFacts();
+    if (editing() && S.route.tab === "models") renderCompare();
+  } catch (e) { toast("Could not load the model list: " + e.message, true); }
+}
+const benchmarks = () => Object.entries(S.bench.benchmarks || {});
+const score = (kind, id) => (S.bench.benchmarks?.[kind]?.scores || {})[id] ?? null;
+function facts(id, needs, primary) {
+  if (!id) return primary ? `<span class="bad">A model is required.</span>` : `<span class="muted">No fallback: if the primary model is unavailable, the task fails.</span>`;
+  const m = S.modelIndex[id];
+  if (!m) return S.models.length ? `<span class="warn">Not in OpenRouter's list of tool-capable models. Check the spelling.</span>` : `<span class="muted">Model list not loaded.</span>`;
+  const parts = [`${usd(m.price_in)} in / ${usd(m.price_out)} out per 1M`, Math.round(m.context / 1000) + "k context", m.image ? "sees images" : "no images", m.pdf ? "reads PDFs" : "no PDFs"];
+  for (const [key, b] of benchmarks()) { const v = score(key, id); if (v !== null) parts.push(`${b.label} ${v}${b.unit || ""}`); }
+  const missing = primary ? [["image", "see images"], ["pdf", "read PDF files"]].filter(([n]) => needs.includes(n) && !m[n]).map(x => x[1]) : [];
+  return `<span class="muted">${esc(parts.join(" · "))}</span>` + (missing.length ? `<br><span class="warn">This role needs to ${missing.join(" and ")}, which this model cannot do.</span>` : "");
+}
+function roleStatus(name) {
+  const r = S.d.status.roles[name];
+  if (!S.draft.roles[name].enabled) return ["disabled", ""];
+  if (!r || !r.exists) return ["not created yet", "warn"];
+  if (r.differences.length) return ["needs apply", "warn"];
+  return r.has_key ? ["in sync", "ok"] : ["in sync, no key", "warn"];
+}
+function refreshFacts() {
+  $$("#dRoles details.role").forEach(el => {
+    const spec = S.draft.roles[el.dataset.role]; if (!spec) return;
+    el.querySelector("[data-facts=model]").innerHTML = facts(spec.model, spec.needs || [], true);
+    el.querySelector("[data-facts=fallback]").innerHTML = facts(spec.fallback, spec.needs || [], false);
+    el.querySelector("[data-sum=model]").textContent = spec.model || "no model";
+    el.querySelector("[data-sum=title]").textContent = spec.title || el.dataset.role;
+    const [text, kind] = roleStatus(el.dataset.role);
+    el.querySelector("[data-sum=status]").outerHTML = `<span class="chip ${kind}" data-sum="status">${esc(text)}</span>`;
+    el.classList.toggle("off", !spec.enabled);
+  });
+}
+function renderDeptTeam() {
+  const open = new Set($$("#dRoles details[open]").map(d => d.dataset.role));
+  const tools = S.company.environment.tools, routing = S.draft.routing || {};
+  const cap = S.d.capabilities || {}, can = f => cap[f] !== false;   // a department says what it cannot do; the default is everything
+  $("#addRoleBtn").hidden = !can("add_role");
+  const problems = [...S.d.errors.map(e => "Error: " + e), ...S.d.warnings.map(w => "Warning: " + w)];
+  $("#deptNotice").innerHTML = problems.length ? `<div class="notice ${S.d.errors.length ? "bad" : "warn"}">${esc(problems.join("\n"))}</div>` : "";
+  $("#presetRow").innerHTML = Object.entries(S.d.presets).map(([key, p]) => `<button class="btn" type="button" data-preset="${esc(key)}" title="${esc(p.description)}">Load “${esc(p.label)}” models</button>`).join("");
+  $("#dRoles").innerHTML = Object.entries(S.draft.roles).map(([name, spec]) => {
+    const needs = spec.needs || [], st = S.d.status.roles[name];
+    const tag = (name === routing.lead ? chip("", "lead") : name === routing.reviewer ? chip("", "reviewer") : "") + (spec.routable === false ? chip("", "direct only") : "");
+    return `<details class="role" data-role="${esc(name)}" ${open.has(name) ? "open" : ""}>
+      <summary><b data-sum="title"></b>${(spec.title || name) !== name ? `<span class="mono muted">${esc(name)}</span>` : ""}${tag}<span class="grow"></span><span class="mono muted hide-sm" data-sum="model"></span><span data-sum="status"></span></summary>
+      <div class="role-body">
+        <div class="field"><label>Title</label><input data-f="title" value="${esc(spec.title || "")}"></div>
+        <div class="field"><label>Thinking effort</label><select data-f="effort">${S.d.choices.efforts.map(e => `<option ${e === (spec.effort || "medium") ? "selected" : ""}>${e}</option>`).join("")}</select></div>
+        <div class="field"><label>Model</label><input data-f="model" list="deptModelList" spellcheck="false" autocomplete="off" value="${esc(spec.model || "")}"><p class="help" data-facts="model"></p></div>
+        <div class="field"><label>Fallback model</label><input data-f="fallback" list="deptModelList" spellcheck="false" autocomplete="off" value="${esc(spec.fallback || "")}"><p class="help" data-facts="fallback"></p></div>
+        <div class="field wide"><label>What this role does</label><textarea data-f="description">${esc(spec.description || "")}</textarea>
+          <p class="help">The lead reads this to decide who gets a task. Detailed rules are under <a href="${deptBase(S.dept)}rules">Rules</a>.</p></div>
+        <div class="field"><label>Tools${cap.tools === "fixed" ? ` <span class="muted" style="font-weight:400">(the same for this department, set by Apply)</span>` : ""}</label><div class="checks">${Object.entries(tools).map(([t, info]) => { const on = (spec.tools || []).includes(t);
+          return `<label title="${esc(info.available ? "" : info.hint)}"><input type="checkbox" data-list="tools" value="${esc(t)}" ${on ? "checked" : ""} ${cap.tools === "fixed" || (!info.available && !on) ? "disabled" : ""}>${esc(info.label)}${info.available ? "" : " (not installed)"}</label>`; }).join("")}</div></div>
+        <div class="field"><label>The model must be able to</label><div class="checks">${[["image", "see images"], ["pdf", "read PDF files"]].map(([n, l]) =>
+          `<label><input type="checkbox" data-list="needs" value="${n}" ${needs.includes(n) ? "checked" : ""}>${l}</label>`).join("")}</div></div>
+        ${st?.differences?.length ? `<p class="help wide">Apply will change: ${esc(st.differences.join("; "))}.</p>` : ""}
+        <div class="row wide" style="margin-top:14px"><label class="row" style="font-weight:400;gap:6px"><input type="checkbox" data-f="enabled" ${spec.enabled !== false ? "checked" : ""}>Enabled</label><span class="grow"></span>
+          <span class="muted" data-test-out role="status"></span><button class="btn" type="button" data-test>Test this model</button>${can("delete_role") ? `<button class="btn danger" type="button" data-delete>Delete role</button>` : ""}</div>
+      </div></details>`;
   }).join("");
-  $("#keyTotal").textContent = `Total used ${money(used)} of $${limit} in limits.`;
-  document.querySelectorAll("[data-key]").forEach(b => b.addEventListener("click", () => {
-    $("#keyName").textContent = b.dataset.key; $("#keyValue").value = ""; $("#keyDialog").showModal();
-  }));
+  refreshFacts();
+}
+loaders["dept:team"] = async () => { await loadDept(); renderDeptTeam(); };
+$("#dRoles").addEventListener("input", e => {
+  const el = e.target, name = el.closest("details.role")?.dataset.role, spec = S.draft.roles[name]; if (!spec) return;
+  if (el.dataset.f === "enabled") spec.enabled = el.checked;
+  else if (el.dataset.f) spec[el.dataset.f] = el.value.trim();
+  else if (el.dataset.list) { const set = new Set(spec[el.dataset.list] || []); el.checked ? set.add(el.value) : set.delete(el.value); spec[el.dataset.list] = [...set]; if (el.dataset.list === "needs" && !set.has("tools")) spec.needs.unshift("tools"); }
+  refreshFacts(); updateSaveBar();
+});
+$("#dRoles").addEventListener("click", async e => {
+  const name = e.target.closest("details.role")?.dataset.role; if (!name) return;
+  if (e.target.matches("[data-test]")) {
+    if (draftDirty()) return toast("Save first - the test uses the saved model", true);
+    const out = e.target.parentElement.querySelector("[data-test-out]"); e.target.disabled = true; out.textContent = "Sending a 1-token request…"; out.className = "muted";
+    try { const r = await api(deptUrl("/test"), { method: "POST", body: { role: name } }); out.textContent = (r.ok ? "✓ " : "✗ ") + r.message; out.className = r.ok ? "ok" : "bad"; }
+    catch (err) { out.textContent = "✗ " + err.message; out.className = "bad"; }
+    e.target.disabled = false;
+  }
+  if (e.target.matches("[data-delete]")) {
+    if (draftDirty()) return toast("Save or discard your changes first", true);
+    if (!await ask(`Delete the role ${name} from this department? Its rules file is removed. A Hermes profile that already exists is left alone. Make a backup first if you may want it back.`)) return;
+    try { const r = await api(deptUrl("/roles/" + enc(name)), { method: "DELETE" }); setDeptState(r); renderDeptTeam();
+      toast(r.profile_left ? `Role removed. The Hermes profile ${name} still exists: delete it with "hermes profile delete ${name}".` : "Role removed"); }
+    catch (err) { toast(err.message, true); }
+  }
+});
+$("#presetRow").addEventListener("click", e => {
+  const p = S.d.presets[e.target.dataset.preset]; if (!p) return;
+  for (const [name, v] of Object.entries(p.roles)) if (S.draft.roles[name]) for (const f of ["model", "fallback", "effort"]) if (v[f] !== undefined) S.draft.roles[name][f] = v[f];
+  renderDeptTeam(); updateSaveBar(); toast(`${p.label} loaded - press Save to keep it`);
+});
+$("#addRoleBtn").onclick = () => {
+  if (draftDirty()) return toast("Save or discard your changes first", true);
+  $("#nrError").textContent = ""; $("#newRoleForm").reset();
+  const lead = (S.draft.routing || {}).lead || "";
+  $("#nrName").value = lead.includes("-") ? lead.split("-")[0] + "-" : ""; $("#newRoleDialog").showModal();
 };
-$("#keyDialog").addEventListener("close", async () => {
-  const d = $("#keyDialog"), v = $("#keyValue").value; $("#keyValue").value = "";
-  if (d.returnValue !== "yes" || !v) return;
-  try { await api("/api/keys/" + $("#keyName").textContent, { method: "PUT", body: { value: v } }); toast("Key saved - Apply to push it to the profile"); loaders.keys(); }
+$("#newRoleForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  try { const r = await api(deptUrl("/roles"), { method: "POST", body: { role: $("#nrName").value.trim(), title: $("#nrTitle").value.trim() } });
+    $("#newRoleDialog").close(); setDeptState(r); renderDeptTeam(); $(`#dRoles details[data-role="${CSS.escape($("#nrName").value.trim())}"]`)?.setAttribute("open", ""); toast("Role added - describe it, then write its rules"); }
+  catch (err) { $("#nrError").textContent = err.message; }
+});
+async function saveDraft() {
+  const r = await api(deptUrl("/config"), { method: "PUT", body: { config: S.draft } });
+  setDeptState(r); await loaders[`dept:${S.route.tab}`]?.();
+}
+$("#draftSave").onclick = async () => { try { await saveDraft(); toast(S.d.status.in_sync ? "Saved" : "Saved - go to Apply"); } catch (e) { toast(e.message, true); } };
+$("#draftDiscard").onclick = () => { S.draft = clone(S.d.config); updateSaveBar(); loaders[`dept:${S.route.tab}`]?.(); };
+
+const REVIEW_LABEL = { changes: "work that produces or changes a deliverable", all: "every task", off: "off" };
+function routingFields() {
+  const cap = S.d.capabilities || {}, can = f => cap[f] !== false;
+  return [
+    { key: "lead", label: "Lead", type: "role", fixed: !can("lead"), help: "the role you talk to; it hands out the tasks" },
+    { key: "review", label: "Review", type: "choice", choices: S.d.choices.review.map(v => [v, REVIEW_LABEL[v] || v]), help: "a reviewer on a different model checks work before it is done" },
+    can("review_scope") && { key: "review_scope", label: "Reviewable work", type: "text", help: "used with the first review option, e.g. a design, or code or a page" },
+    { key: "reviewer", label: "Reviewer", type: "role", help: "" },
+    { key: "task_timeout", label: "Task timeout", type: "text", placeholder: "45m", help: "e.g. 45m, 2h - a task that runs longer is stopped and queued again" },
+    can("projects_dir") && { key: "projects_dir", label: "Projects folder", type: "text", help: "every project of this department gets its own subfolder here" },
+    ...(S.d.routing_extra || []),
+  ].filter(Boolean);
+}
+loaders["dept:routing"] = async () => {
+  await loadDept();
+  const routing = S.draft.routing || {}, value = f => f.key === "projects_dir" ? S.draft.projects_dir || "" : routing[f.key] ?? "";
+  const roles = Object.entries(S.draft.roles).map(([n, r]) => [n, r.title && r.title !== n ? `${r.title} (${n})` : n]);
+  const options = (list, v) => list.map(([id, label]) => `<option value="${esc(id)}" ${String(id) === String(v) ? "selected" : ""}>${esc(label)}</option>`).join("");
+  $("#dRouting").innerHTML = routingFields().map(f => { const v = value(f), a = `data-r="${esc(f.key)}" aria-label="${esc(f.label)}"`;
+    const control = f.type === "role" ? `<select ${a} ${f.fixed ? "disabled" : ""}>${options(roles, v)}</select>`
+      : f.type === "choice" ? `<select ${a}>${options(f.choices, v)}</select>`
+      : f.type === "int" ? `<input ${a} type="number" min="${f.min}" max="${f.max}" value="${esc(v)}">`
+      : `<input ${a} ${f.type === "model" ? `list="deptModelList" spellcheck="false" autocomplete="off"` : ""} placeholder="${esc(f.placeholder || "")}" value="${esc(v)}">`;
+    return `<b>${esc(f.label)}</b>${control}<span class="muted">${esc(f.help || "")}</span>`; }).join("");
+  loadDeptBoard();
+};
+$("#dRouting").addEventListener("input", e => {
+  const key = e.target.dataset.r; if (!key) return;
+  const v = e.target.type === "number" && e.target.value !== "" ? Number(e.target.value) : e.target.value.trim();
+  if (key === "projects_dir") S.draft.projects_dir = v; else (S.draft.routing ||= {})[key] = v;
+  updateSaveBar();
+});
+async function loadDeptBoard() {
+  const b = await api(deptUrl("/board"));
+  $("#dBoardState").innerHTML = `dispatcher: <span class="${b.dispatcher_running ? "ok" : "warn"}">${b.dispatcher_running ? "running" : "not running"}</span>`;
+  $("#dBoardTable tbody").innerHTML = boardRows(b.tasks, `No tasks yet. Talk to the lead: hermes -p ${(S.d.config.routing || {}).lead || "<lead>"}`);
+}
+$("#dBoardRefresh").onclick = loadDeptBoard;
+
+loaders["dept:rules"] = async () => {
+  await loadDept(); const name = S.dept, engine = (S.d.capabilities || {}).projects_dir !== false;
+  await openRulesEditor({ id: "d:" + name, list: `/api/departments/${enc(name)}/rules`, item: p => `/api/departments/${enc(name)}/rules/${p}`, prefix: S.d.rules_prefix ?? `departments/${name}/`,
+    label: p => p.replace(/^(policies|roles)\//, "").replace(/\.md$/, ""),
+    lead: `How this department's agents work. The department rules go to every role; a role's own file goes to that role only. Keep them short.${engine ? ` <span class="mono">{projects_dir}</span> is replaced by the projects folder.` : ""}`,
+    saved: async () => { setDeptState(await api(`/api/departments/${enc(name)}`)); openRulesEditor(RULES); } });
+};
+
+loaders["dept:keys"] = async () => {
+  await loadDept();
+  const k = S.d.status.key, title = S.d.config.name || S.dept, roles = Object.entries(S.d.status.roles).filter(([, r]) => r.enabled);
+  const own = (S.d.capabilities || {}).shared_key === false;   // every role has its own key, there is no shared one
+  $("#dKeysLead").innerHTML = own ? `One OpenRouter key per role, never shown again once saved. A new key is checked with OpenRouter first; press <b>Apply</b> to push it to the agent's profile. Set spending limits in OpenRouter.`
+    : `OpenRouter keys for this department, never shown again once saved. The most specific key wins: a role's own, then the department's, then the shared one. Keys reach the agents' profiles at once, without applying. Set spending limits in OpenRouter.`;
+  $("#dKeyCard").hidden = own;
+  const count = src => roles.filter(([, r]) => r.key_source === src).length;
+  const row = (scope, label, set, used) => `<tr><td><b>${esc(label)}</b></td><td>${set ? chip("ok", "set") : chip("", "not set")}</td><td class="muted">${used} role${used === 1 ? "" : "s"}</td>
+    <td><div class="row end">${k.sources.map(s => `<button class="btn" data-import="${esc(s.id)}" data-scope="${scope}" title="${esc(s.label)}">Use the ${esc(s.id === "hermes" ? "main Hermes" : s.id)} key</button>`).join("")}
+    <button class="btn" data-setkey="${scope}">${set ? "Replace" : "Set key"}</button>${set ? `<button class="btn danger" data-rmkey="${scope}">Remove</button>` : ""}</div></td></tr>`;
+  $("#dKeyTable tbody").innerHTML = row("shared", "Shared by all departments", k.shared, count("shared")) + row("department", `${title} only`, k.department, count("department"));
+  const uses = { role: ["ok", "its own key"], department: ["ok", "the department's key"], shared: ["ok", "the shared key"] };
+  $("#dRoleKeyTable tbody").innerHTML = roles.map(([name, r]) => { const [kind, text] = uses[r.key_source] || ["bad", "no key - cannot call a model"];
+    return `<tr data-usage="${esc(name)}"><td><b>${esc(S.d.config.roles[name].title)}</b>${S.d.config.roles[name].title !== name ? ` <span class="mono muted">${esc(name)}</span>` : ""}</td><td>${chip(kind, text)}</td>
+      <td data-u="amount" class="muted">${r.has_key ? "…" : "–"}</td><td data-u="bar"></td>
+      <td><div class="row end"><button class="btn" data-setkey="role" data-role="${esc(name)}">${r.key_source === "role" ? "Replace key" : own ? "Set key" : "Give it its own key"}</button>${
+      r.key_source === "role" ? `<button class="btn danger" data-rmkey="role" data-role="${esc(name)}">Remove key</button>` : ""}</div></td></tr>`; }).join("");
+  $("#dKeyTotal").textContent = "";
+  loadKeyUsage(S.dept);
+};
+// Spend and limit per key come from OpenRouter, so they are filled in after the table is shown.
+async function loadKeyUsage(dept) {
+  let usage; try { usage = await api(`/api/departments/${enc(dept)}/key-usage`); } catch { usage = null; }
+  if (S.dept !== dept || S.route.tab !== "keys") return;
+  let used = 0, limit = 0; const seen = new Set();
+  $$("#dRoleKeyTable tr[data-usage]").forEach(tr => {
+    const u = usage && usage[tr.dataset.usage], amount = tr.querySelector("[data-u=amount]"), bar = tr.querySelector("[data-u=bar]");
+    if (!u) { amount.textContent = usage ? "–" : "could not ask OpenRouter"; return; }
+    if (!u.valid) { amount.innerHTML = `<span class="bad">key rejected by OpenRouter</span>`; return; }
+    const shared = u.shared_with.length ? ` <span class="muted">(same key as ${esc(u.shared_with.join(", "))})</span>` : "";
+    amount.innerHTML = `${money(u.usage)} / ${u.limit == null ? "no limit" : "$" + u.limit}${shared}`; amount.className = "";
+    const pct = u.limit ? Math.min(100, u.usage / u.limit * 100) : 0;
+    bar.innerHTML = u.limit ? `<div class="bar"><i class="${pct > 90 ? "full" : pct > 70 ? "hi" : ""}" style="width:${pct}%"></i></div>` : "";
+    const id = [tr.dataset.usage, ...u.shared_with].sort()[0]; if (!seen.has(id)) { seen.add(id); used += u.usage || 0; limit += u.limit || 0; }
+  });
+  if (usage) $("#dKeyTotal").textContent = `Total used ${money(used)}${limit ? ` of $${limit} in limits` : ""}.`;
+}
+async function keyAction(body, message) {
+  const r = await api(deptUrl("/key"), { method: "POST", body });
+  const draft = S.draft; setDeptState(r); S.draft = draft; updateSaveBar();
+  toast(message + (r.profiles_updated ? ` Written to ${r.profiles_updated} profile${r.profiles_updated === 1 ? "" : "s"}.` : "") + (r.note ? " " + r.note : "")); loaders["dept:keys"]();
+}
+$("section[data-view='dept:keys']").addEventListener("click", async e => {
+  const b = e.target.closest("button"); if (!b) return;
+  const scope = b.dataset.setkey || b.dataset.rmkey || b.dataset.scope, role = b.dataset.role || "", what = role || (scope === "shared" ? "the shared key" : "this department's key");
+  try {
+    if (b.dataset.setkey) openKeyDialog(what, (S.d.capabilities || {}).shared_key === false ? "It is checked with OpenRouter before it is saved." : "It is written to the agents' profiles straight away.", v => keyAction({ scope, role, key: v }, "Key saved."));
+    else if (b.dataset.import) await keyAction({ scope, source: b.dataset.import }, "Key imported.");
+    else if (b.dataset.rmkey && await ask(`Remove ${role ? role + "'s own key" : what}? Agents that used it fall back to the next key that applies, or have none.`)) await keyAction({ scope, role, remove: true }, "Key removed.");
+  } catch (err) { toast(err.message, true); }
+});
+
+loaders["dept:models"] = async () => { await loadDept(); renderCompare(); };
+function renderCompare() {
+  const keys = benchmarks().map(([k]) => k), q = $("#modelFilter").value.trim().toLowerCase();
+  $("#benchNote").textContent = (benchmarks().map(([, b]) => `${b.label}: ${b.what} (${b.date}).`).join(" ") + " " + (S.bench.note || "")).trim() || "Compare the models roles can use.";
+  $("#compare thead").innerHTML = `<tr><th>Model</th><th class="num">In</th><th class="num">Out</th><th class="num">Context</th><th>Images</th><th>PDF</th>${benchmarks().map(([, b]) => `<th class="num">${esc(b.label)}</th>`).join("")}</tr>`;
+  const rank = m => keys.map(k => score(k, m.id) ?? -1);
+  const rows = S.models.filter(m => q ? m.id.toLowerCase().includes(q) : keys.some(k => score(k, m.id) !== null))
+    .sort((a, b) => { const x = rank(a), y = rank(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return y[i] - x[i]; return a.id.localeCompare(b.id); }).slice(0, 80);
+  $("#compare tbody").innerHTML = rows.length ? rows.map(m => `<tr><td class="mono">${esc(m.id)}</td><td class="num">${usd(m.price_in)}</td><td class="num">${usd(m.price_out)}</td><td class="num">${Math.round(m.context / 1000)}k</td>
+    <td>${m.image ? "yes" : "no"}</td><td>${m.pdf ? "yes" : "no"}</td>${keys.map(k => `<td class="num">${score(k, m.id) === null ? "–" : score(k, m.id) + (S.bench.benchmarks[k].unit || "")}</td>`).join("")}</tr>`).join("")
+    : `<tr><td colspan="${6 + keys.length}" class="muted">${q ? "No model matches." : "No benchmark scores yet - type in the box to search all models."}</td></tr>`;
+}
+$("#modelFilter").addEventListener("input", renderCompare);
+$("#modelsRefresh").onclick = async e => { e.target.disabled = true; await loadDeptModels(true); e.target.disabled = false; toast("Model list refreshed"); };
+
+loaders["dept:apply"] = async () => {
+  await loadDept();
+  const roles = Object.entries(S.d.status.roles), pending = roles.filter(([, r]) => r.enabled && r.differences.length).length, history = !!(S.d.capabilities || {}).history;
+  $("#dApplySummary").textContent = draftDirty() ? "You have unsaved changes - they are saved first." : pending ? `${pending} role${pending === 1 ? "" : "s"} differ from Hermes.`
+    : S.d.status.pending ? "Saved changes to the team or its rules are not applied yet." : "Hermes matches this department's configuration.";
+  $("#dDiffTable tbody").innerHTML = roles.map(([name, r]) => `<tr><td><b>${esc(S.d.config.roles[name].title)}</b>${S.d.config.roles[name].title !== name ? ` <span class="mono muted">${esc(name)}</span>` : ""}</td>
+    <td>${!r.enabled ? chip("", "disabled") : !r.exists ? chip("warn", "not created yet") : r.differences.length ? chip("warn", "needs apply") : chip("ok", "in sync")}${r.enabled && !r.has_key ? " " + chip("bad", "no key") : ""}</td>
+    <td class="muted">${esc(r.differences.join("; ") || (S.d.status.pending && r.enabled && r.has_key ? "rules or routing may have changed" : "–"))}</td></tr>`).join("");
+  $("#dHistoryCard").hidden = !history;
+  if (history) $("#dHistory").textContent = (await api("/api/history")).join("\n");
+};
+$("#dApplyBtn").addEventListener("click", async () => {
+  const names = Object.entries(S.draft.roles).filter(([n, r]) => r.enabled && S.d.status.roles[n]?.has_key !== false).map(([n]) => n);
+  if (!await ask(`Create or update ${names.length} Hermes profiles: ${names.join(", ")}? Their model, tools, API key and role rules are overwritten. It takes about half a minute.`)) return;
+  const btn = $("#dApplyBtn"); btn.disabled = true; $("#dApplyLog").textContent = "Applying…";
+  try {
+    if (draftDirty()) await saveDraft();
+    const r = await api(deptUrl("/apply"), { method: "POST", body: { message: $("#dApplyMsg").value } });
+    $("#dApplyMsg").value = ""; $("#dApplyLog").textContent = r.log || "(no output)"; setDeptState(r.state); loaders["dept:apply"]();
+    toast(r.ok ? "Applied. Start a new Hermes session to use the changes." : "Apply finished with problems - see the log", !r.ok);
+  } catch (e) { $("#dApplyLog").textContent = e.message; toast(e.message, true); }
+  btn.disabled = false;
+});
+$("#dDiscardBtn").addEventListener("click", async () => {
+  if (!await ask("Throw away every change to this department's team and rules that has not been applied?")) return;
+  try { await api("/api/discard", { method: "POST" }); S.d = null; await loaders["dept:apply"](); renderHead(); updateSaveBar(); refreshPending().catch(() => {}); toast("Discarded"); }
+  catch (e) { toast(e.message, true); }
+});
+$("#dUndoBtn").addEventListener("click", async () => {
+  if (draftDirty()) return toast("Save or discard your unsaved changes first", true);
+  if (!await ask("Undo the last apply of this department and apply the settings from before it?")) return;
+  try { const r = await api("/api/undo", { method: "POST" }); $("#dApplyLog").textContent = r.output || ""; S.d = null; await loaders["dept:apply"](); renderHead(); refreshPending().catch(() => {}); toast("Undone: " + r.reverted); }
   catch (e) { toast(e.message, true); }
 });
 
-// ---- knowledge ----
-loaders.kb = async () => {
+// ================= backup and restore =================
+const B = { dept: "", title: "" };
+async function loadBackups(dept, title, what) {
+  B.dept = dept; B.title = title;
+  $("#backupLead").innerHTML = `Save the settings of <b>${esc(title)}</b> (${what}) and bring them back later. A restore changes only the settings files; go to <b>Apply</b> afterwards to push them to Hermes.`;
+  renderBackups(await api(`/api/backups/${enc(dept)}`));
+}
+function renderBackups(list) {
+  $("#backupTable tbody").innerHTML = list.length ? list.map(b => `<tr>
+    <td class="muted" style="white-space:nowrap">${when(b.created)}</td>
+    <td><b>${esc(b.label || "(no name)")}</b>${b.automatic ? " " + chip("", "automatic") : ""}</td>
+    <td class="muted">${b.roles.length} roles · ${b.files} files · ${fmtSize(b.size)} ${b.keys ? chip("warn", `${b.keys} API key${b.keys === 1 ? "" : "s"}`) : chip("", "no keys")}</td>
+    <td><div class="row end"><button class="btn primary" data-restore="${esc(b.id)}" data-keys="${b.keys}" data-label="${esc(b.label || when(b.created))}">Restore</button>
+      <a class="btn" href="/api/backups/${enc(B.dept)}/${enc(b.id)}/download" download>Download</a><button class="btn danger" data-delbackup="${esc(b.id)}">Delete</button></div></td></tr>`).join("")
+    : `<tr><td colspan="4" class="muted">No backups yet. Press “Back up now” to make the first one.</td></tr>`;
+}
+async function afterRestore() {
+  setDeptState(await api(`/api/departments/${enc(B.dept)}`));
+}
+$("#backupForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  try { const r = await api(`/api/backups/${enc(B.dept)}`, { method: "POST", body: { label: $("#backupLabel").value, include_keys: $("#backupKeys").checked } });
+    $("#backupLabel").value = ""; renderBackups(r.backups); toast("Backup saved"); }
+  catch (err) { toast(err.message, true); }
+});
+$("#backupTable").addEventListener("click", async e => {
+  const b = e.target.closest("button"); if (!b) return;
+  try {
+    if (b.dataset.restore) {
+      if (draftDirty()) return toast("Save or discard your unsaved changes first", true);
+      const keys = Number(b.dataset.keys);
+      if (!await ask(`Restore “${b.dataset.label}” for ${B.title}? The current settings are replaced${keys ? `, including ${keys} API key${keys === 1 ? "" : "s"}` : "; API keys stay as they are"}. They are saved first as a backup named “before restore”.`)) return;
+      const r = await api(`/api/backups/${enc(B.dept)}/${enc(b.dataset.restore)}/restore`, { method: "POST", body: { with_keys: true } });
+      renderBackups(r.backups); await afterRestore();
+      toast(r.unchanged ? "Nothing to restore - the settings already match this backup" : `Restored: ${r.written} file${r.written === 1 ? "" : "s"} written, ${r.removed} removed${r.keys ? `, ${r.keys} keys` : ""}. Go to Apply to push it to Hermes.`);
+    } else if (b.dataset.delbackup) {
+      if (!await ask("Delete this backup? This cannot be undone.")) return;
+      renderBackups(await api(`/api/backups/${enc(B.dept)}/${enc(b.dataset.delbackup)}`, { method: "DELETE" })); toast("Backup deleted");
+    }
+  } catch (err) { toast(err.message, true); }
+});
+$("#backupImportBtn").onclick = () => $("#backupFile").click();
+$("#backupFile").onchange = async e => {
+  const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+  try { const r = await api(`/api/backups/${enc(B.dept)}/import`, { method: "POST", body: { backup: JSON.parse(await file.text()) } });
+    renderBackups(r.backups); toast("Backup added to the list - press Restore to use it"); }
+  catch (err) { toast(err instanceof SyntaxError ? "That file is not a backup file" : err.message, true); }
+};
+loaders["dept:backup"] = async () => { await loadDept(); await loadBackups(S.dept, S.d.config.name || S.dept, "roles, models, routing and rules"); };
+
+// ================= knowledge =================
+loaders.knowledge = async () => {
   const s = await api("/api/kb/status");
   const job = s.reindex?.state === "running" ? `<span class="warn">reindexing…</span>` : s.reindex?.state === "done" ? `<span class="muted">last reindex ${esc(s.reindex.at)}: +${s.reindex.stats.added} ~${s.reindex.stats.updated} −${s.reindex.stats.removed}</span>` : "";
   $("#kbStatus").innerHTML = `<div class="grow"><b>${s.files}</b> files · <b>${s.chunks}</b> chunks · <span class="mono">${esc((s.model || "no index yet").split("/").pop())}</span><br>
@@ -335,13 +1465,12 @@ loaders.kb = async () => {
   loadLibrary();
   if (s.reindex?.state === "running") watchIndex();
   const ls = await api("/api/kb/lessons");
-  $("#lessons").innerHTML = ls.length ? ls.map(l => `<details class="hit"><summary><span class="mono">${esc(l.name)}</span> <span class="muted">by ${esc(l.role)}</span></summary><pre>${esc(l.text)}</pre><button class="btn danger" data-del="${esc(l.name)}">Delete</button></details>`).join("") : `<p class="muted">No lessons yet.</p>`;
-  document.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+  $("#lessons").innerHTML = ls.length ? ls.map(l => `<details class="hit"><summary><span class="mono">${esc(l.name)}</span> <span class="muted">by ${esc(l.role)}</span></summary><pre>${esc(l.text)}</pre><button class="btn danger" data-del="${esc(l.name)}" style="margin-top:8px">Delete</button></details>`).join("") : `<p class="muted">No lessons yet.</p>`;
+  $$("[data-del]").forEach(b => b.onclick = async () => {
     if (!await ask(`Delete lesson ${b.dataset.del}?`)) return;
-    await api("/api/kb/lessons/" + b.dataset.del, { method: "DELETE" }); toast("Deleted"); loaders.kb();
+    await api("/api/kb/lessons/" + b.dataset.del, { method: "DELETE" }); toast("Deleted"); loaders.knowledge();
   });
 };
-// ---- library ----
 let TREE = [], currentFolder = "datasheets";
 const fmtSize = b => b > 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
 async function loadLibrary() {
@@ -368,11 +1497,11 @@ function renderFolder() {
       <td class="hide-sm muted">${new Date(file.mtime * 1000).toLocaleDateString()}</td>
       <td>${f.reserved ? "" : `<div class="row"><select data-move="${esc(rel)}" aria-label="Move to"><option value="">Move to…</option>${others.map(o => `<option>${esc(o.path)}</option>`).join("")}</select><button class="btn danger" data-delfile="${esc(rel)}">Delete</button></div>`}</td></tr>`;
   }).join("") : `<tr><td colspan="5" class="muted">No files in this folder.</td></tr>`;
-  document.querySelectorAll("[data-delfile]").forEach(b => b.onclick = async () => {
+  $$("[data-delfile]").forEach(b => b.onclick = async () => {
     if (!await ask(`Delete ${b.dataset.delfile}? It is removed from disk and from the index.`)) return;
     try { await api("/api/kb/file/" + b.dataset.delfile, { method: "DELETE" }); toast("Deleted"); watchIndex(); loadLibrary(); } catch (e) { toast(e.message, true); }
   });
-  document.querySelectorAll("[data-move]").forEach(s => s.onchange = async () => {
+  $$("[data-move]").forEach(s => s.onchange = async () => {
     if (!s.value) return;
     try { await api("/api/kb/file/move", { method: "POST", body: { path: s.dataset.move, to_folder: s.value } }); toast("Moved to " + s.value); watchIndex(); loadLibrary(); } catch (e) { toast(e.message, true); }
   });
@@ -400,7 +1529,7 @@ function watchIndex() {
     $("#indexJob").innerHTML = !j ? "" : j.state === "running" ? `<span class="warn">⟳ ${esc(j.msg || "indexing")}…</span>`
       : j.state === "error" ? `<span class="bad">index error: ${esc(j.error)}</span>`
       : `<span class="ok">✓ indexed at ${esc(j.at)}</span> <span class="muted">+${j.stats.added} ~${j.stats.updated} −${j.stats.removed}, ${j.stats.chunks} chunks, ${j.stats.seconds}s</span>`;
-    if (j?.state === "running") setTimeout(tick, 1500); else { loadLibrary(); loaders.kbStatusOnly?.(); }
+    if (j?.state === "running") setTimeout(tick, 1500); else loadLibrary();
   };
   tick();
 }
@@ -421,7 +1550,6 @@ $("#deleteFolderBtn").onclick = async () => {
   if (!await ask(`Delete the empty folder knowledge/${currentFolder}?`)) return;
   try { await api("/api/kb/folder/" + currentFolder, { method: "DELETE" }); currentFolder = ""; toast("Folder deleted"); loadLibrary(); } catch (e) { toast(e.message, true); }
 };
-
 $("#kbSearchForm").addEventListener("submit", async e => {
   e.preventDefault(); const q = $("#kbQuery").value.trim(); if (!q) return;
   $("#kbHits").innerHTML = `<p class="muted">Searching…</p>`;
@@ -431,56 +1559,31 @@ $("#kbSearchForm").addEventListener("submit", async e => {
   } catch (err) { $("#kbHits").innerHTML = `<p class="bad">${esc(err.message)}</p>`; }
 });
 
-// ---- services ----
+// ================= services =================
 loaders.services = async () => {
-  const s = await api("/api/services");
+  const [s, c] = await Promise.all([api("/api/services"), loadCompany()]);
+  const tools = Object.values(c.environment.tools).map(t => `<p><b>${esc(t.label)}</b> ${t.available ? `<span class="ok">available</span>` : `<span class="warn">not available</span> <span class="muted">${esc(t.hint)}</span>`}</p>`).join("");
   $("#svc").innerHTML = `<p><b>Embedder</b> ${s.embedder.ok ? `<span class="ok">running</span> <span class="muted mono">${esc(s.embedder.device)} · ${esc(s.embedder.embed_model)}</span>` : `<span class="bad">down - ${esc(s.embedder.error)}</span>`}</p>
     <p><b>Apple model</b> ${s.apple_model.available ? `<span class="ok">available</span>` : `<span class="warn">${esc(s.apple_model.reason)}</span>`}</p>
+    <p><b>Task dispatcher</b> ${c.environment.dispatcher_running ? `<span class="ok">running</span>` : `<span class="warn">not running - tasks will wait</span>`}</p>${tools}
     <pre class="mono">${esc(s.profiles)}</pre>`;
 };
 $("#pingBtn").addEventListener("click", async () => {
-  if (!await ask("Send one tiny real request to each of the 9 agents? This costs a few cents in total and takes about a minute.")) return;
+  const team = await api("/api/team"), roles = Object.keys(team.roles);
+  if (!await ask(`Send one tiny real request to each of the ${roles.length} software agents? This costs a few cents in total and takes about a minute.`)) return;
   const btn = $("#pingBtn"); btn.disabled = true; $("#pingOut").textContent = "pinging…";
   try {
-    const team = await api("/api/team");
-    const r = await api("/api/ping", { method: "POST", body: { roles: Object.keys(team.roles) } });
+    const r = await api("/api/ping", { method: "POST", body: { roles } });
     $("#pingOut").innerHTML = Object.entries(r).map(([k, v]) => `<span class="${v.ok ? "ok" : "bad"}">${v.ok ? "✓" : "✗"}</span> ${esc(k)} <span class="muted">${v.seconds}s</span>`).join("<br>");
   } catch (e) { $("#pingOut").textContent = e.message; }
   btn.disabled = false;
 });
 
-// ---- apply ----
-async function refreshPending() {
-  const p = await api("/api/pending");
-  $("#pendingBadge").hidden = !p.diff;
-  return p;
-}
-loaders.apply = async () => {
-  const p = await refreshPending();
-  $("#pendingOut").innerHTML = p.diff ? `<p><b>Pending changes</b></p><pre class="mono">${esc(p.diff)}</pre><p><b>Effect on profiles (dry run)</b></p><pre class="mono">${esc(p.dry_run)}</pre>` : `<p class="muted">No pending changes. Apply can still re-sync profiles (e.g. after replacing a key).</p>`;
-  $("#history").textContent = (await api("/api/history")).join("\n");
-};
-$("#applyBtn").addEventListener("click", async () => {
-  if (!await ask("Apply team.yaml and policies to all Hermes profiles now?")) return;
-  const btn = $("#applyBtn"); btn.disabled = true;
-  try { const r = await api("/api/apply", { method: "POST", body: { message: $("#applyMsg").value } }); $("#applyMsg").value = ""; toast("Applied: " + r.commit); loaders.apply(); }
-  catch (e) { toast(e.message, true); }
-  btn.disabled = false;
-});
-$("#discardBtn").addEventListener("click", async () => {
-  if (!await ask("Discard all unsaved edits to team.yaml and policies?")) return;
-  await api("/api/discard", { method: "POST" }); toast("Discarded"); loaders.apply();
-});
-$("#undoBtn").addEventListener("click", async () => {
-  if (!await ask("Revert the last panel change and re-apply profiles?")) return;
-  try { const r = await api("/api/undo", { method: "POST" }); toast("Reverted: " + r.reverted); loaders.apply(); }
-  catch (e) { toast(e.message, true); }
-});
-
-// ---- start ----
-let start = "team"; try { start = localStorage.getItem("tab") || "team"; } catch {}
-document.querySelector(`nav button[data-tab="${start}"]`)?.click();
+// ================= start =================
+if (!location.hash) { let saved = ""; try { saved = localStorage.getItem("route") || ""; } catch {} history.replaceState(null, "", saved.startsWith("#/") ? saved : "#/overview"); }
+navigate();
 refreshPending().catch(() => {});
+loadCompany().catch(e => toast(e.message, true));
 </script>
 </body>
 </html>
