@@ -86,4 +86,3 @@ routing:
   dispatch_interval_seconds: 20
   task_timeout: 45m            # a single task is stopped after this long
   planner_model: deepseek/deepseek-v4-flash   # cheap model for splitting work into tasks
-mode: general
