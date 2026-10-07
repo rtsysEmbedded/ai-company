@@ -1,11 +1,13 @@
 """LanceDB index: ingest (incremental by file hash) and hybrid search with rerank."""
 import hashlib
 import os
+import re
 import time
 from typing import Dict, List, Optional
 
 import lancedb
 import pyarrow as pa
+import yaml
 
 from . import embedder
 from .chunk import chunk_file, supported
@@ -59,6 +61,26 @@ def _tables(db, dim: int, model: str):
     return db.open_table(CHUNKS), db.open_table(FILES)
 
 
+def read_meta(path: str) -> dict:
+    """YAML front matter of a Markdown file ({} if none or unparsable)."""
+    if not path.lower().endswith((".md", ".markdown")):
+        return {}
+    text = open(path, encoding="utf-8", errors="replace").read(20000)
+    m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+    try:
+        meta = yaml.safe_load(m.group(1)) if m else {}
+    except yaml.YAMLError:
+        return {}
+    return meta if isinstance(meta, dict) else {}
+
+
+def _meta_tags(meta: dict) -> str:
+    """Front-matter tags plus `kind:<kind>`, so notes can be filtered by kind."""
+    tags = meta.get("tags") or ""
+    tags = " ".join(map(str, tags)) if isinstance(tags, list) else str(tags)
+    return " ".join(filter(None, [tags, f"kind:{meta['kind']}" if meta.get("kind") else ""]))
+
+
 def walk(base: str = KNOWLEDGE):
     for d, dirs, files in os.walk(base):
         dirs[:] = [x for x in dirs if not x.startswith(".")]
@@ -84,6 +106,7 @@ def ingest(base: str = KNOWLEDGE, enrich=None, log=print) -> Dict[str, int]:
             continue
         pieces = chunk_file(path)
         summary, tags = enrich(path, "\n".join(c.text for c in pieces)[:12000]) if enrich and pieces else ("", "")
+        tags = " ".join(filter(None, [tags, _meta_tags(read_meta(path))]))
         # Embed with a context header so a chunk knows which file/section it came from.
         header = f"{summary}\nTags: {tags}\n" if summary or tags else ""
         texts = [f"{rel} > {c.section}\n{header}{c.text}" for c in pieces]
@@ -113,8 +136,10 @@ def ingest(base: str = KNOWLEDGE, enrich=None, log=print) -> Dict[str, int]:
 
 
 def search(query: str, k: int = 6, path_prefix: Optional[str] = None, kind: Optional[str] = None,
-           candidates: int = 50, use_rerank: bool = True) -> List[dict]:
-    """Hybrid search: vector top-N + BM25 top-N, fused with RRF, then reranked."""
+           candidates: int = 50, use_rerank: bool = True, tag: Optional[str] = None) -> List[dict]:
+    """Hybrid search: vector top-N + BM25 top-N, fused with RRF, then reranked.
+
+    `tag` keeps only chunks whose tags contain that word, e.g. "kind:decision"."""
     db = _db()
     if CHUNKS not in db.table_names():
         return []
@@ -124,6 +149,8 @@ def search(query: str, k: int = 6, path_prefix: Optional[str] = None, kind: Opti
         where.append(f"path LIKE '{_esc(path_prefix)}%'")
     if kind:
         where.append(f"kind = '{_esc(kind)}'")
+    if tag:
+        where.append(f"(' ' || tags || ' ') LIKE '% {_esc(tag)} %'")
     flt = " AND ".join(where) or None
     cols = ["id", "path", "section", "kind", "text", "summary", "tags"]
 

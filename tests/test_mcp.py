@@ -35,6 +35,21 @@ async def main():
             print("kb_add escape blocked:", (await call("kb_add", title="../../etc/evil", body="x")).startswith("Saved and indexed: knowledge/lessons/"))
             created.append((await call("kb_search", query="evil", k=1)).split("] ", 1)[-1].split(" >", 1)[0])
             print("kb_add secret refused:", "Refused" in await call("kb_add", title="k", body="key sk-or-v1-abc"))
+            dec = await call("kb_add", title="MCP test decision gearbox bus", kind="decision",
+                             body="Use CAN-FD for the gearbox bus: 8 nodes, needs 64-byte frames.",
+                             files="motor/src/can.c", links=f"related_to {created[0]}")
+            print("kb_add decision:", dec); created.append(dec.split(": ", 1)[-1])
+            print("kb_add bad kind refused:", "Unknown kind" in await call("kb_add", title="x", body="x", kind="junk"))
+            print("kb_add bad link refused:", "not found" in await call("kb_add", title="x", body="x", links="depends_on ../.env"))
+            only = await call("kb_search", query="gearbox bus watchdog", k=5, note_kind="decision")
+            print("note_kind filter:", "MCP test decision" in only and "MCP test lesson" not in only)
+            print("backlink:", f"related_to <- {created[-1]}" in await call("kb_get", path=created[0]))
+            ret = await call("kb_retire", path=created[-1], reason="test cleanup")
+            print("kb_retire:", ret); created[-1] = ret.split(": ", 1)[-1]
+            gone = await call("kb_search", query="gearbox bus CAN-FD", k=5, note_kind="decision")
+            print("retired hidden from search:", "MCP test decision" not in gone)
+            print("retired kept with reason:", "retired_reason: test cleanup" in await call("kb_get", path=created[-1]))
+            print("kb_retire outside lessons refused:", "Not found" in await call("kb_retire", path="policies/global.md", reason="x"))
             print("kb_policies:", "Global policy" in await call("kb_policies"))
             print("kb_status:", (await call("kb_status")).splitlines()[0])
     # clean up test lessons and re-sync index
