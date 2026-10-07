@@ -4,11 +4,19 @@ provider: openrouter
 roles:
   manager:
     hermes_profile: default
+    model: typesafe/jev-router                # Jev picks the model per request; no fixed price
+    fallback: deepseek/deepseek-v4-pro-0813
+    effort: medium
+    key_env: OPENROUTER_KEY_MANAGER
+    description: Company manager. Takes every request, decides which team owns it and hands it to that team's lead.
+  # Leads the software team: gets the software jobs from the manager and from the other leads. It shares the manager's key.
+  sw-lead:
+    title: Software lead
     model: deepseek/deepseek-v4-pro-0813      # 0.40 / 4.20
     fallback: openai/gpt-5.6-luna-pro
     effort: medium
     key_env: OPENROUTER_KEY_MANAGER
-    description: Manager. Plans coding work, splits it into tasks and routes each to the right specialist.
+    description: Software lead. Plans software work, splits it into tasks and routes each to the right specialist. Talk to this one about software.
   frontend:
     model: google/gemini-3.8-flash            # 0.75 / 3.75
     fallback: anthropic/claude-sonnet-5.5
@@ -74,6 +82,7 @@ roles:
     routable: false
     description: General assistant - answers questions and does any task itself, start to finish. Not part of the manager's task routing.
 routing:
+  lead: sw-lead                # leads the software team; without it the manager splits software work itself
   review: code                 # code = every code-changing task goes to the reviewer | all | off
   reviewer: reviewer
   security_review: sensitive   # sensitive = auth, input handling, crypto, dependencies | always | off
@@ -85,4 +94,4 @@ routing:
   max_per_profile: 1           # agents per role at the same time
   dispatch_interval_seconds: 20
   task_timeout: 45m            # a single task is stopped after this long
-  planner_model: deepseek/deepseek-v4-flash   # cheap model for splitting work into tasks
+  planner_model: typesafe/jev-router   # model the dispatcher uses to split and specify tasks
