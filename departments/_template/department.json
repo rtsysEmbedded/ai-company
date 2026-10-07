@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "name": "{{title}}",
+  "provider": "openrouter",
+  "projects_dir": "~/Company_Projects/{{name}}",
+  "task_tag": "{{prefix}}",
+  "routing": {
+    "lead": "{{prefix}}-lead",
+    "reviewer": "{{prefix}}-review",
+    "review": "changes",
+    "review_scope": "a deliverable",
+    "task_timeout": "45m"
+  },
+  "roles": {
+    "{{prefix}}-lead": {
+      "title": "{{title}} lead",
+      "enabled": true,
+      "model": "anthropic/claude-sonnet-5.5",
+      "fallback": "x-ai/grok-4.7",
+      "effort": "high",
+      "tools": ["kanban"],
+      "needs": ["tools"],
+      "description": "{{title}} lead. Understands the request, plans the work, hands tasks to the specialists and checks the result. Talk to this one."
+    },
+    "{{prefix}}-specialist": {
+      "title": "{{title}} specialist",
+      "enabled": true,
+      "model": "google/gemini-3.8-flash",
+      "fallback": "anthropic/claude-sonnet-5.5",
+      "effort": "medium",
+      "tools": [],
+      "needs": ["tools"],
+      "description": "Does the {{title}} work. Replace this with what the role is good at; the lead reads it to decide who gets a task."
+    },
+    "{{prefix}}-review": {
+      "title": "{{title}} reviewer",
+      "enabled": true,
+      "model": "x-ai/grok-4.7",
+      "fallback": "anthropic/claude-sonnet-5.5",
+      "effort": "high",
+      "tools": [],
+      "needs": ["tools"],
+      "description": "Independent review of {{title}} work. Checks it against the task's acceptance criteria and approves it or returns it with concrete fixes."
+    }
+  }
+}

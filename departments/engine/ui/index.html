@@ -1,0 +1,754 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Departments</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1b1f24; --muted: #5b6470; --line: #c9cfd6;
+    --accent: #0b5cad; --accent-text: #ffffff; --ok: #0a6b3c; --ok-bg: #e2f4ea;
+    --warn: #8a5200; --warn-bg: #fdf0d8; --bad: #a3221c; --bad-bg: #fbe5e3; --code-bg: #eef0f3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171b; --panel: #1d2127; --text: #e7eaee; --muted: #a3acb8; --line: #3b434d;
+      --accent: #7ab8f5; --accent-text: #0d1b2a; --ok: #7fd6a4; --ok-bg: #173526;
+      --warn: #f2c26b; --warn-bg: #3b2c0f; --bad: #f29b94; --bad-bg: #40191a; --code-bg: #262b32;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { accent-color: var(--accent); }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 1rem/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header, main { max-width: 60rem; margin-inline: auto; padding-inline: 1rem; }
+  header { padding-block: 1.5rem 0.5rem; }
+  h1 { font-size: 1.6rem; margin: 0; }
+  h2 { font-size: 1.15rem; margin: 0 0 0.25rem; }
+  h3 { font-size: 1rem; margin: 0; }
+  p { margin: 0.25rem 0 0.75rem; }
+  a { color: var(--accent); }
+  .muted { color: var(--muted); }
+  code { background: var(--code-bg); padding: 0.05rem 0.3rem; border-radius: 4px; font-size: 0.9em; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; margin-block: 1rem; }
+  .chips { list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0; margin: 0.75rem 0 0; }
+  .chip { border-radius: 999px; padding: 0.2rem 0.7rem; font-size: 0.9rem; border: 1px solid currentColor; white-space: nowrap; }
+  .ok { color: var(--ok); background: var(--ok-bg); }
+  .warn { color: var(--warn); background: var(--warn-bg); }
+  .bad { color: var(--bad); background: var(--bad-bg); }
+  #banner:empty { display: none; }
+  #banner { border-radius: 8px; padding: 0.6rem 0.8rem; margin-block: 1rem; border: 1px solid currentColor; white-space: pre-wrap; position: sticky; top: 0.5rem; z-index: 3; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.75rem; margin-top: 0.75rem; }
+  .card { border: 1px solid var(--line); border-radius: 8px; padding: 0.8rem; background: var(--bg); display: flex; flex-direction: column; gap: 0.4rem; }
+  .card.selected { border: 2px solid var(--accent); padding: calc(0.8rem - 1px); }
+  .card .chips { margin: 0; }
+  .card .grow { flex: 1; }
+  label, legend { font-weight: 600; }
+  label { display: block; margin-top: 0.8rem; }
+  label.inline { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 400; margin: 0.3rem 1rem 0 0; min-height: 2rem; }
+  input[type=text], input[type=password], select, textarea {
+    display: block; width: 100%; font: inherit; color: inherit; background: var(--bg);
+    border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem 0.6rem; margin-top: 0.2rem;
+  }
+  textarea { min-height: 4.5rem; resize: vertical; }
+  .help { font-size: 0.9rem; color: var(--muted); margin: 0.2rem 0 0; }
+  .facts { font-size: 0.9rem; margin: 0.25rem 0 0; }
+  .facts .problem { color: var(--bad); font-weight: 600; }
+  .facts .caution { color: var(--warn); font-weight: 600; }
+  fieldset { border: 0; padding: 0; margin: 0.8rem 0 0; }
+  button, a.button { font: inherit; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: inherit; padding: 0.5rem 0.9rem; cursor: pointer; min-height: 2.5rem; text-decoration: none; display: inline-flex; align-items: center; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: 0.6; cursor: progress; }
+  .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.8rem; }
+  details.role { border: 1px solid var(--line); border-radius: 8px; margin-top: 0.6rem; background: var(--bg); }
+  details.role > summary { cursor: pointer; padding: 0.7rem 0.8rem; display: flex; flex-wrap: wrap; gap: 0.3rem 0.8rem; align-items: baseline; }
+  details.role > summary .title { font-weight: 600; }
+  details.role > .body { padding: 0 0.8rem 0.9rem; border-top: 1px solid var(--line); }
+  fieldset.keybox { border: 1px solid var(--line); border-radius: 8px; padding: 0.2rem 0.8rem 0.8rem; background: var(--panel); }
+  fieldset.keybox legend { padding-inline: 0.3rem; }
+  .actions { position: sticky; bottom: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.7rem 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; z-index: 2; }
+  #dirty { font-weight: 600; color: var(--warn); }
+  pre { background: var(--code-bg); border-radius: 8px; padding: 0.8rem; overflow-x: auto; white-space: pre-wrap; margin: 0.5rem 0 0; font-size: 0.9rem; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--text); max-width: 34rem; width: calc(100% - 2rem); padding: 1.2rem; }
+  dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Departments</h1>
+  <p class="muted">The company's agent teams in Hermes. Nothing changes in Hermes until you apply.</p>
+  <ul class="chips" id="chips" aria-label="Status of this machine"></ul>
+</header>
+<main>
+  <div id="banner" role="status" aria-live="polite"></div>
+
+  <section aria-labelledby="departments-title">
+    <h2 id="departments-title">All departments</h2>
+    <p class="muted">Choose a department to configure it below.</p>
+    <div class="cards" id="departments"></div>
+    <div class="row"><button type="button" id="new-department">Add a department…</button></div>
+  </section>
+
+  <div id="department" hidden>
+    <section aria-labelledby="key-title">
+      <h2 id="key-title">OpenRouter API key</h2>
+      <p id="key-status" class="muted">Loading…</p>
+      <form id="key-form" autocomplete="off">
+        <fieldset>
+          <legend>This key is for</legend>
+          <label class="inline"><input type="radio" name="key-scope" value="shared" checked> All departments on this page</label>
+          <label class="inline"><input type="radio" name="key-scope" value="department"> <span id="key-scope-department">Only this department</span></label>
+        </fieldset>
+        <label for="key-input">New key</label>
+        <input type="password" id="key-input" name="key" autocomplete="off" spellcheck="false" aria-describedby="key-help">
+        <p class="help" id="key-help">Stored in <code>departments/.env</code> (readable only by you) and written to the agents' profiles straight away. It is never shown again. A department's own key wins over the shared one, and a single role can have its own key in its card under Roles.</p>
+        <div class="row" id="key-buttons"><button type="submit">Save key</button></div>
+      </form>
+    </section>
+
+    <form id="config-form" novalidate>
+      <section aria-labelledby="presets-title" id="presets-section">
+        <h2 id="presets-title">Model presets</h2>
+        <p class="muted">Fill in every role's model at once. You can still change single roles below. Nothing is saved until you press Save.</p>
+        <div class="row" id="presets"></div>
+        <p class="help" id="preset-note"></p>
+      </section>
+
+      <section aria-labelledby="roles-title">
+        <h2 id="roles-title">Roles</h2>
+        <p class="muted">Each role is one Hermes profile. Type in a model field to search OpenRouter's list. <span id="models-age"></span></p>
+        <div id="roles"></div>
+      </section>
+
+      <section aria-labelledby="settings-title">
+        <h2 id="settings-title">Department settings</h2>
+        <label for="projects-dir">Projects folder</label>
+        <input type="text" id="projects-dir" name="projects_dir" required aria-describedby="projects-help">
+        <p class="help" id="projects-help">Every project of this department gets its own subfolder here.</p>
+
+        <label for="lead">Lead (the role you talk to; it hands out the tasks)</label>
+        <select id="lead" name="lead"></select>
+
+        <fieldset>
+          <legend>Review</legend>
+          <div id="review-modes"></div>
+        </fieldset>
+        <label for="review-scope">What counts as reviewable work</label>
+        <input type="text" id="review-scope" name="review_scope" aria-describedby="review-scope-help">
+        <p class="help" id="review-scope-help">Used with the first review option. The lead asks for a review of every task that produces or changes this, for example <code>a design</code> or <code>a customer-facing text</code>.</p>
+        <label for="reviewer">Reviewer</label>
+        <select id="reviewer" name="reviewer"></select>
+
+        <label for="timeout">Time limit per task</label>
+        <input type="text" id="timeout" name="task_timeout" required aria-describedby="timeout-help">
+        <p class="help" id="timeout-help">For example <code>45m</code> or <code>2h</code>. A task that runs longer is stopped and queued again.</p>
+      </section>
+
+      <div class="actions">
+        <button type="submit" class="primary" id="save">Save</button>
+        <button type="button" id="apply">Save and apply to Hermes</button>
+        <button type="button" id="refresh">Refresh model list</button>
+        <span id="dirty"></span>
+      </div>
+    </form>
+
+    <section aria-labelledby="log-title">
+      <h2 id="log-title">Last apply</h2>
+      <pre id="log" tabindex="0">Nothing applied in this session yet.</pre>
+    </section>
+
+    <section aria-labelledby="compare-title">
+      <h2 id="compare-title">Compare models</h2>
+      <p class="muted" id="bench-note"></p>
+      <label for="filter">Search all tool-capable models</label>
+      <input type="text" id="filter" placeholder="e.g. sonnet, flash, grok" aria-describedby="filter-help">
+      <p class="help" id="filter-help">With the box empty, only models that have a benchmark score are listed. Prices are US dollars per 1 million tokens.</p>
+      <div class="table-wrap"><table id="compare"><thead></thead><tbody></tbody></table></div>
+    </section>
+  </div>
+</main>
+
+<datalist id="model-list"></datalist>
+
+<dialog id="confirm" aria-labelledby="confirm-title">
+  <h2 id="confirm-title">Confirm</h2>
+  <p id="confirm-text"></p>
+  <div class="row">
+    <button type="button" class="primary" id="confirm-yes">Continue</button>
+    <button type="button" id="confirm-no">Cancel</button>
+  </div>
+</dialog>
+
+<dialog id="new-dialog" aria-labelledby="new-title">
+  <h2 id="new-title">Add a department</h2>
+  <p class="muted">Creates a folder with three starter roles (lead, specialist, reviewer) that you then rename and describe. No Hermes profile is created until you apply.</p>
+  <form id="new-form" autocomplete="off">
+    <label for="new-display">Title</label>
+    <input type="text" id="new-display" required placeholder="Research" aria-describedby="new-display-help">
+    <p class="help" id="new-display-help">Shown to you and to the agents, for example <code>Research</code> or <code>Sales</code>.</p>
+    <label for="new-name">Folder name</label>
+    <input type="text" id="new-name" required pattern="[a-z][a-z0-9\-]{1,30}" placeholder="research" aria-describedby="new-name-help">
+    <p class="help" id="new-name-help">Lowercase letters, digits and <code>-</code>.</p>
+    <label for="new-prefix">Role prefix</label>
+    <input type="text" id="new-prefix" required pattern="[a-z][a-z0-9]{0,7}" placeholder="rs" aria-describedby="new-prefix-help">
+    <p class="help" id="new-prefix-help">Short and unique. The roles become <code>rs-lead</code>, <code>rs-specialist</code>, <code>rs-review</code>.</p>
+    <p id="new-error" class="facts" role="alert"></p>
+    <div class="row">
+      <button type="submit" class="primary">Create department</button>
+      <button type="button" id="new-cancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let company = null, dept = null, state = null, models = [], modelIndex = {}, bench = {}, savedSnapshot = "";
+const keyNotes = {};   // role -> {text, kind}: the result of the last key action, shown inside that role's card
+
+function el(tag, props = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (key === "class") node.className = value;
+    else if (key === "text") node.textContent = value;
+    else if (key in node && key !== "list") node[key] = value;
+    else node.setAttribute(key, value);
+  }
+  for (const child of [].concat(children)) if (child) node.append(child);
+  return node;
+}
+
+async function api(path, body) {
+  const options = body === undefined ? {} : {
+    method: "POST", body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json", "X-Requested-With": "departments" },
+  };
+  const response = await fetch(path, options);
+  let data = {};
+  try { data = await response.json(); } catch (error) { /* non-JSON error page */ }
+  if (!response.ok) throw new Error(data.error || ("Request failed (" + response.status + ")"));
+  return data;
+}
+
+function banner(text, kind) {
+  const node = $("banner");
+  node.textContent = text || "";
+  node.className = text ? kind : "";
+}
+
+function confirmDialog(text, yesLabel) {
+  return new Promise((resolve) => {
+    const dialog = $("confirm");
+    $("confirm-text").textContent = text;
+    $("confirm-yes").textContent = yesLabel || "Continue";
+    const finish = (answer) => { dialog.close(); resolve(answer); };
+    $("confirm-yes").onclick = () => finish(true);
+    $("confirm-no").onclick = () => finish(false);
+    dialog.oncancel = () => resolve(false);
+    dialog.showModal();
+  });
+}
+
+// --- model facts ---------------------------------------------------------------
+const benchmarks = () => Object.entries(bench.benchmarks || {});
+function score(kind, id) {
+  const table = (bench.benchmarks || {})[kind];
+  return table && table.scores[id] !== undefined ? table.scores[id] : null;
+}
+const money = (value) => value === null ? "?" : "$" + value.toFixed(2);
+
+function factsFor(id, needs, isPrimary) {
+  const box = el("p", { class: "facts" });
+  if (!id) {
+    if (isPrimary) box.append(el("span", { class: "problem", text: "A model is required." }));
+    else box.textContent = "No fallback: if the primary model is unavailable, the task fails.";
+    return box;
+  }
+  const info = modelIndex[id];
+  if (!info) {
+    box.append(el("span", { class: models.length ? "caution" : "muted",
+      text: models.length ? "Not in OpenRouter's current list of tool-capable models. Check the spelling." : "Model list not loaded, cannot check this id." }));
+    return box;
+  }
+  const parts = [money(info.price_in) + " in / " + money(info.price_out) + " out per 1M tokens",
+    Math.round(info.context / 1000) + "k context", info.image ? "sees images" : "no image input", info.pdf ? "reads PDFs" : "no PDF input"];
+  for (const [key, table] of benchmarks()) {
+    const value = score(key, id);
+    if (value !== null) parts.push(table.label + " " + value + (table.unit || ""));
+  }
+  box.append(parts.join(" · "));
+  if (isPrimary) {
+    const missing = [];
+    if (needs.includes("image") && !info.image) missing.push("see images");
+    if (needs.includes("pdf") && !info.pdf) missing.push("read PDF files");
+    if (missing.length) box.append(el("br"), el("span", { class: "caution", text: "This role needs to " + missing.join(" and ") + ", which this model cannot do." }));
+  }
+  return box;
+}
+
+// --- overview ------------------------------------------------------------------
+function chip(ok, text, kindWhenBad, tag) {
+  return el(tag || "li", { class: "chip " + (ok ? "ok" : (kindWhenBad || "bad")), text: (ok ? "✓ " : "✗ ") + text });
+}
+
+function renderChips() {
+  const env = company.environment;
+  $("chips").replaceChildren(
+    chip(env.hermes.found, env.hermes.found ? (env.hermes.version.split("·")[0].trim() || "Hermes found") : "Hermes not found"),
+    ...Object.values(env.tools).filter((tool) => tool.kind === "mcp").map((tool) =>
+      chip(tool.available, tool.label.split(" (")[0].replace(" and skill", "") + (tool.available ? "" : " not available"), "warn")),
+    chip(env.dispatcher_running === true, env.dispatcher_running ? "Task dispatcher running" : "Task dispatcher not running", "warn"));
+}
+
+function renderDepartments() {
+  const cards = [];
+  const software = company.software;
+  if (software.present) {
+    cards.push(el("div", { class: "card" }, [
+      el("h3", { text: "Software" }),
+      el("p", { class: "muted grow", text: software.roles + " roles, managed by its own control panel (team, routing, policies, knowledge base)." }),
+      el("div", { class: "chips" }, chip(software.panel_running, software.panel_running ? "Panel running" : "Panel not running", "warn", "span")),
+      software.panel_running
+        ? el("a", { class: "button", href: "/go/software", target: "_blank", rel: "noopener", text: "Open the software panel" })
+        : el("p", { class: "help", text: "Start it with scripts/install_services.sh." }),
+    ]));
+  }
+  for (const item of company.departments) {
+    const selected = item.name === dept;
+    cards.push(el("div", { class: "card" + (selected ? " selected" : "") }, [
+      el("h3", { text: item.title }),
+      el("p", { class: "muted grow", text: item.error ? item.error : item.enabled + " roles, lead " }, item.error ? [] : el("code", { text: item.lead })),
+      item.error ? null : el("div", { class: "chips" }, [
+        chip(item.in_sync, item.in_sync ? "In sync with Hermes" : "Not applied yet", "warn", "span"),
+        chip(item.has_key, item.has_key ? "API key set" : item.roles_with_key ? "Key for " + item.roles_with_key + " of " + item.enabled + " roles" : "No API key",
+          item.roles_with_key ? "warn" : "bad", "span")]),
+      el("button", { type: "button", text: selected ? "Selected" : "Configure", "aria-pressed": String(selected), onclick: () => selectDepartment(item.name) }),
+    ]));
+  }
+  $("departments").replaceChildren(...cards);
+}
+
+// --- one department --------------------------------------------------------------
+function renderKey() {
+  const s = state.status.key, title = state.config.name || dept;
+  $("key-scope-department").textContent = "Only " + title;
+  $("key-status").textContent = s.department ? title + " has its own key." + (s.shared ? " A shared key is also set." : "")
+    : s.shared ? "A shared key is set and used by " + title + "." : "No shared or department key is set.";
+  const own = Object.values(state.status.roles).filter((role) => role.enabled && role.key_source === "role").length;
+  const without = Object.values(state.status.roles).filter((role) => role.enabled && !role.has_key).length;
+  $("key-status").textContent += (own ? " " + own + " role" + (own === 1 ? " has" : "s have") + " their own key." : "") +
+    (without ? " " + without + " role" + (without === 1 ? " has" : "s have") + " no key yet and cannot call a model." : " Every role has a key.");
+  const row = $("key-buttons");
+  row.replaceChildren(el("button", { type: "submit", text: "Save key" }));
+  for (const source of s.sources) {
+    row.append(el("button", { type: "button", text: "Use the key from: " + source.label,
+      onclick: () => keyAction({ import: source.id }, "Key imported.") }));
+  }
+  if (s.department || s.shared) row.append(el("button", { type: "button", text: "Remove the selected key",
+    onclick: async () => { if (await confirmDialog("Remove this key? Agents that used it fall back to the next key that applies, or have none.", "Remove key")) keyAction({ remove: true }, "Key removed."); } }));
+}
+
+function roleStatus(name) {
+  const role = state.status.roles[name];
+  if (!role.enabled) return ["disabled", "warn"];
+  if (!role.exists) return ["not created yet", "warn"];
+  if (role.differences.length) return ["needs apply", "warn"];
+  return [role.has_key ? (role.key_source === "role" ? "in sync, own key" : "in sync") : "in sync, no key", role.has_key ? "ok" : "warn"];
+}
+
+function renderRoles() {
+  const container = $("roles");
+  const open = new Set([...container.querySelectorAll("details[open]")].map((d) => d.dataset.role));
+  container.replaceChildren();
+  const registry = company.environment.tools;
+  for (const [name, spec] of Object.entries(state.config.roles)) {
+    const id = (suffix) => name + "-" + suffix;
+    const [statusText, statusKind] = roleStatus(name);
+    const needs = spec.needs || [];
+    const modelFacts = el("div", { id: id("model-facts") }), fallbackFacts = el("div", { id: id("fallback-facts") });
+    const modelInput = el("input", { type: "text", id: id("model"), name: id("model"), list: "model-list", value: spec.model || "",
+      required: true, spellcheck: false, autocomplete: "off", "aria-describedby": id("model-facts") });
+    const fallbackInput = el("input", { type: "text", id: id("fallback"), name: id("fallback"), list: "model-list", value: spec.fallback || "",
+      spellcheck: false, autocomplete: "off", "aria-describedby": id("fallback-facts") });
+    const summaryModel = el("code", { text: spec.model });
+    const refresh = () => {
+      modelFacts.replaceChildren(factsFor(modelInput.value.trim(), needs, true));
+      fallbackFacts.replaceChildren(factsFor(fallbackInput.value.trim(), needs, false));
+      summaryModel.textContent = modelInput.value.trim() || "no model";
+      markDirty();
+    };
+    modelInput.addEventListener("input", refresh);
+    fallbackInput.addEventListener("input", refresh);
+
+    const effort = el("select", { id: id("effort"), name: id("effort") },
+      state.choices.efforts.map((value) => el("option", { value, text: value, selected: value === (spec.effort || "medium") })));
+    const tools = Object.entries(registry).map(([tool, info]) => {
+      const checked = (spec.tools || []).includes(tool);
+      return el("label", { class: "inline", title: info.available ? "" : info.hint }, [
+        el("input", { type: "checkbox", name: id("tool"), value: tool, checked, disabled: !info.available && !checked }),
+        info.label + (info.available ? "" : " (not available on this machine)")]);
+    });
+    const needBoxes = [["image", "Must see images"], ["pdf", "Must read PDF files"]].map(([need, label]) =>
+      el("label", { class: "inline" }, [el("input", { type: "checkbox", name: id("need"), value: need, checked: needs.includes(need),
+        onchange: () => { const list = currentNeeds(name); needs.length = 0; needs.push(...list); refresh(); } }), label]));
+    const testResult = el("span", { class: "muted", role: "status" });
+    const testButton = el("button", { type: "button", text: "Test this model", onclick: async () => {
+      testButton.disabled = true; testResult.textContent = "Sending a 1-token request…"; testResult.className = "muted";
+      try {
+        const result = await api("/api/test", { dept, role: name });
+        testResult.textContent = (result.ok ? "✓ " : "✗ ") + result.message;
+        testResult.className = result.ok ? "chip ok" : "chip bad";
+      } catch (error) { testResult.textContent = "✗ " + error.message; testResult.className = "chip bad"; }
+      testButton.disabled = false;
+    } });
+    const differences = state.status.roles[name].differences;
+
+    // This role's own API key: optional, wins over the department's and the shared key.
+    const source = state.status.roles[name].key_source;
+    const keyInput = el("input", { type: "password", id: id("key"), autocomplete: "off", spellcheck: false, "aria-describedby": id("key-help"),
+      placeholder: source === "role" ? "Paste a new key to replace it" : "Paste a key for this role only" });
+    const sendRoleKey = (body, message) => keyAction({ scope: "role", role: name, ...body }, message);
+    const saveRoleKey = () => {
+      const key = keyInput.value.trim();
+      if (!key) { banner("Paste a key into the field first.", "bad"); keyInput.focus(); return; }
+      sendRoleKey({ key }, "Key saved for " + name + ".");
+    };
+    keyInput.addEventListener("input", markDirty);
+    keyInput.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); saveRoleKey(); } });
+    const keyText = { role: "This role has its own key.", department: "Uses the department's key.", shared: "Uses the shared key." }[source] || "No key yet: this agent cannot call a model.";
+    const keyBlock = el("fieldset", { class: "keybox" }, [
+      el("legend", { text: "API key for this role" }),
+      el("p", { class: "facts", id: id("key-help") }, [el("span", { class: "chip " + (source ? "ok" : "bad"), text: (source ? "\u2713 " : "\u2717 ") + keyText }),
+        " Its own key lets you set a separate spending limit for this role."]),
+      el("label", { for: id("key"), text: "OpenRouter key" }), keyInput,
+      el("p", { class: "help", text: "Paste the key, then press Enter or the button below. The main Save button saves it too." }),
+      keyNotes[name] ? el("p", { class: "facts", role: "status" }, el("span", { class: "chip " + keyNotes[name].kind, text: keyNotes[name].text })) : null,
+      el("div", { class: "row" }, [
+        el("button", { type: "button", text: source === "role" ? "Replace key" : "Save key for this role", onclick: saveRoleKey }),
+        source === "role" ? el("button", { type: "button", text: "Remove this role's key", onclick: async () => {
+          if (await confirmDialog("Remove " + name + "'s own key? It will fall back to the department's or the shared key, if one is set.", "Remove key")) sendRoleKey({ remove: true }, "Key removed for " + name + ".");
+        } }) : null]),
+    ]);
+
+    const details = el("details", { class: "role" }, [
+      el("summary", {}, [el("span", { class: "title", text: spec.title }), el("code", { text: name }), summaryModel,
+        el("span", { class: "chip " + statusKind, text: statusText })]),
+      el("div", { class: "body" }, [
+        el("label", { class: "inline" }, [el("input", { type: "checkbox", id: id("enabled"), name: id("enabled"), checked: spec.enabled !== false }), "Enabled"]),
+        differences.length ? el("p", { class: "help", text: "Apply will change: " + differences.join("; ") + "." }) : null,
+        keyBlock,
+        el("label", { for: id("title"), text: "Title" }),
+        el("input", { type: "text", id: id("title"), name: id("title"), value: spec.title || "", required: true }),
+        el("label", { for: id("model"), text: "Model" }), modelInput, modelFacts,
+        el("label", { for: id("fallback"), text: "Fallback model (used when the first one is unavailable)" }), fallbackInput, fallbackFacts,
+        el("label", { for: id("effort"), text: "Thinking effort" }), effort,
+        el("fieldset", {}, [el("legend", { text: "Tools" }), ...tools]),
+        el("fieldset", {}, [el("legend", { text: "What the model must be able to do" }), ...needBoxes]),
+        el("label", { for: id("description"), text: "What this role does" }),
+        el("textarea", { id: id("description"), name: id("description"), value: spec.description || "", required: true, "aria-describedby": id("description-help") }),
+        el("p", { class: "help", id: id("description-help"), text: "The lead reads this to decide who gets a task. Detailed rules live in departments/" + dept + "/roles/" + name + ".md." }),
+        el("div", { class: "row" }, [testButton, testResult]),
+      ]),
+    ]);
+    details.dataset.role = name;
+    if (open.has(name)) details.open = true;
+    container.append(details);
+    refresh();
+  }
+}
+
+const currentNeeds = (name) => ["tools", ...[...document.querySelectorAll('input[name="' + name + '-need"]:checked')].map((box) => box.value)];
+
+function renderSettings() {
+  const config = state.config, routing = config.routing || {};
+  $("projects-dir").value = config.projects_dir || "";
+  $("timeout").value = routing.task_timeout || "60m";
+  $("review-scope").value = routing.review_scope || "";
+  for (const [selectId, current] of [["lead", routing.lead], ["reviewer", routing.reviewer]]) {
+    $(selectId).replaceChildren(...Object.entries(config.roles).map(([name, spec]) =>
+      el("option", { value: name, text: spec.title + " (" + name + ")", selected: name === current })));
+  }
+  const labels = { changes: "Review every task that produces or changes reviewable work (see below)", all: "Review every task", off: "No automatic review" };
+  $("review-modes").replaceChildren(...state.choices.review.map((mode) => el("label", { class: "inline" }, [
+    el("input", { type: "radio", name: "review", value: mode, checked: mode === (routing.review || "changes") }), labels[mode] || mode])));
+}
+
+function renderPresets() {
+  const entries = Object.entries(state.presets);
+  $("presets-section").hidden = entries.length === 0;
+  $("preset-note").textContent = "";
+  $("presets").replaceChildren(...entries.map(([key, preset]) =>
+    el("button", { type: "button", text: "Load “" + preset.label + "”", title: preset.description, onclick: () => {
+      for (const [name, values] of Object.entries(preset.roles)) {
+        if (!state.config.roles[name]) continue;
+        for (const field of ["model", "fallback", "effort"]) {
+          const input = $(name + "-" + field);
+          if (input && values[field] !== undefined) { input.value = values[field]; input.dispatchEvent(new Event("input")); }
+        }
+      }
+      $("preset-note").textContent = preset.label + ": " + preset.description + " Loaded into the form; press Save to keep it.";
+      markDirty();
+    } })));
+}
+
+function renderModels() {
+  $("model-list").replaceChildren(...models.map((m) => el("option", { value: m.id,
+    label: money(m.price_in) + " / " + money(m.price_out) + (m.image ? " · images" : "") + (m.pdf ? " · PDF" : "") })));
+  $("bench-note").textContent = benchmarks().map(([, b]) => b.label + ": " + b.what + " (" + b.date + ")").join(" ") + " " + (bench.note || "");
+  const head = (text, numeric) => el("th", { scope: "col", class: numeric ? "num" : "", text });
+  $("compare").tHead.replaceChildren(el("tr", {}, [head("Model"), head("In", true), head("Out", true), head("Context", true),
+    head("Images"), head("PDF"), ...benchmarks().map(([, b]) => head(b.label, true))]));
+  renderCompare();
+}
+
+function renderCompare() {
+  const query = $("filter").value.trim().toLowerCase(), keys = benchmarks().map(([key]) => key);
+  const rank = (m) => keys.map((key) => score(key, m.id) ?? -1);
+  const rows = models.filter((m) => query ? m.id.toLowerCase().includes(query) : keys.some((key) => score(key, m.id) !== null))
+    .sort((a, b) => { const x = rank(a), y = rank(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return y[i] - x[i]; return a.id.localeCompare(b.id); })
+    .slice(0, 80);
+  const cell = (text, numeric) => el("td", { class: numeric ? "num" : "", text });
+  $("compare").tBodies[0].replaceChildren(...rows.map((m) => el("tr", {}, [
+    el("td", {}, el("code", { text: m.id })), cell(money(m.price_in), true), cell(money(m.price_out), true),
+    cell(Math.round(m.context / 1000) + "k", true), cell(m.image ? "yes" : "no"), cell(m.pdf ? "yes" : "no"),
+    ...benchmarks().map(([key, b]) => cell(score(key, m.id) === null ? "–" : score(key, m.id) + (b.unit || ""), true))])));
+  if (!rows.length) $("compare").tBodies[0].append(el("tr", {}, el("td", { colSpan: 6 + keys.length, text: "No model matches." })));
+}
+
+// --- form <-> config -----------------------------------------------------------
+function readForm() {
+  const config = { projects_dir: $("projects-dir").value.trim(), routing: {
+    lead: $("lead").value, reviewer: $("reviewer").value, task_timeout: $("timeout").value.trim(), review_scope: $("review-scope").value.trim(),
+    review: (document.querySelector('input[name="review"]:checked') || {}).value || "changes" }, roles: {} };
+  for (const name of Object.keys(state.config.roles)) {
+    config.roles[name] = {
+      enabled: $(name + "-enabled").checked, title: $(name + "-title").value.trim(),
+      model: $(name + "-model").value.trim(), fallback: $(name + "-fallback").value.trim(),
+      effort: $(name + "-effort").value, description: $(name + "-description").value.trim(),
+      tools: [...document.querySelectorAll('input[name="' + name + '-tool"]:checked')].map((box) => box.value),
+      needs: currentNeeds(name),
+    };
+  }
+  return config;
+}
+
+// Redraw the role cards (fresh status and model facts) without losing what the user has typed.
+function rerenderKeepingEdits() {
+  const draft = readForm();
+  const typedKeys = Object.fromEntries(Object.keys(draft.roles).map((name) => [name, $(name + "-key") ? $(name + "-key").value : ""]));
+  renderRoles();
+  for (const [name, value] of Object.entries(typedKeys)) if (value && $(name + "-key")) $(name + "-key").value = value;
+  for (const [name, role] of Object.entries(draft.roles)) {
+    $(name + "-enabled").checked = role.enabled;
+    $(name + "-title").value = role.title;
+    $(name + "-effort").value = role.effort;
+    $(name + "-description").value = role.description;
+    for (const box of document.querySelectorAll('input[name="' + name + '-tool"]')) box.checked = role.tools.includes(box.value);
+    for (const box of document.querySelectorAll('input[name="' + name + '-need"]')) box.checked = role.needs.includes(box.value);
+    for (const field of ["model", "fallback"]) { const input = $(name + "-" + field); input.value = role[field]; input.dispatchEvent(new Event("input")); }
+  }
+  markDirty();
+}
+
+function markDirty() {
+  if (!state) return;
+  let current = null;
+  try { current = JSON.stringify(readForm()); } catch (error) { /* form not drawn yet */ }
+  const keys = pendingKeys().length;
+  $("dirty").textContent = (current !== null && current !== savedSnapshot) || keys
+    ? "Unsaved changes" + (keys ? " (including " + (keys === 1 ? "a key" : keys + " keys") + ")" : "") : "";
+}
+
+// Keys typed into the top field or into role cards that have not been saved yet.
+function pendingKeys() {
+  const list = [];
+  if (!state) return list;
+  const top = $("key-input").value.trim();
+  if (top) list.push({ scope: document.querySelector('input[name="key-scope"]:checked').value, key: top, label: "the key section at the top" });
+  for (const name of Object.keys(state.config.roles)) {
+    const input = $(name + "-key");
+    if (input && input.value.trim()) list.push({ scope: "role", role: name, key: input.value.trim(), label: name });
+  }
+  return list;
+}
+
+function renderDepartment() {
+  renderKey(); renderRoles(); renderSettings(); renderPresets();
+  savedSnapshot = JSON.stringify(readForm());
+  markDirty();
+  const problems = [...state.errors.map((e) => "Error: " + e), ...state.warnings.map((w) => "Warning: " + w)];
+  if (problems.length && !$("banner").textContent) banner(problems.join("\n"), state.errors.length ? "bad" : "warn");
+}
+
+async function refreshOverview() {
+  company = await api("/api/departments");
+  renderChips(); renderDepartments();
+}
+
+async function selectDepartment(name) {
+  if ($("dirty").textContent && name !== dept &&
+      !await confirmDialog("You have unsaved changes in this department. Switch anyway and lose them?", "Switch")) return;
+  try {
+    banner("", "");
+    state = await api("/api/state?dept=" + encodeURIComponent(name));
+    dept = name;
+    history.replaceState(null, "", "?dept=" + encodeURIComponent(name));
+    document.title = (state.config.name || name) + " – Departments";
+    $("log").textContent = "Nothing applied in this session yet.";
+    $("department").hidden = false;
+    renderDepartments();
+    renderDepartment();
+    await loadModels(false);
+    savedSnapshot = JSON.stringify(readForm()); markDirty();
+  } catch (error) { banner(error.message, "bad"); }
+}
+
+// --- actions -------------------------------------------------------------------
+// Saves the configuration. Keys that were typed but not saved yet are saved first, so the main
+// Save button never silently drops a pasted key.
+async function save() {
+  const config = readForm(), savedKeys = [];
+  for (const item of pendingKeys()) {
+    try {
+      await api("/api/key", { dept, scope: item.scope, role: item.role, key: item.key });
+    } catch (error) {
+      if (item.role) keyNotes[item.role] = { text: "\u2717 Not saved: " + error.message, kind: "bad" };
+      rerenderKeepingEdits();
+      throw new Error("The key for " + item.label + " was not saved: " + error.message);
+    }
+    if (item.role) { $(item.role + "-key").value = ""; keyNotes[item.role] = { text: "\u2713 Key saved.", kind: "ok" }; }
+    else $("key-input").value = "";
+    savedKeys.push(item.label);
+  }
+  state = await api("/api/config", { dept, config });
+  banner("", "");
+  renderDepartment();
+  await refreshOverview();
+  return savedKeys;
+}
+
+async function keyAction(body, message) {
+  const scope = body.scope || document.querySelector('input[name="key-scope"]:checked').value;
+  try {
+    const result = await api("/api/key", { dept, ...body, scope });
+    state = result;
+    if (body.role) { $(body.role + "-key").value = ""; keyNotes[body.role] = { text: "\u2713 " + message, kind: "ok" }; }
+    else $("key-input").value = "";
+    const written = result.profiles_updated || 0;
+    const waiting = Object.values(state.status.roles).some((role) => role.enabled && !role.exists);
+    banner(message + (written ? " Written to " + written + " agent profile" + (written === 1 ? "" : "s") + "; it is used from the next session." : "") +
+      (waiting ? " Roles that are not created yet get it when you apply." : ""), "ok");
+    renderKey(); rerenderKeepingEdits();
+    await refreshOverview();
+  } catch (error) {
+    if (body.role) { keyNotes[body.role] = { text: "\u2717 Not saved: " + error.message, kind: "bad" }; rerenderKeepingEdits(); }
+    banner(error.message, "bad");
+  }
+}
+
+function busy(button, label) {
+  const original = button.textContent;
+  button.disabled = true; button.textContent = label;
+  return () => { button.disabled = false; button.textContent = original; };
+}
+
+$("config-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const done = busy($("save"), "Saving…");
+  try {
+    const keys = await save();
+    banner((keys.length ? "Saved, including the key for " + keys.join(", ") + "." : "Saved.") +
+      (state.status.in_sync ? "" : " Hermes still has the old settings until you apply."), "ok");
+  } catch (error) { banner(error.message, "bad"); }
+  done();
+});
+
+$("apply").addEventListener("click", async () => {
+  const names = Object.entries(readForm().roles).filter(([, role]) => role.enabled).map(([name]) => name);
+  if (!await confirmDialog("This saves the configuration and creates or updates " + names.length + " Hermes profiles: " + names.join(", ") +
+      ". Their model, tools, API key and role rules are overwritten. It takes about half a minute.", "Save and apply")) return;
+  const done = busy($("apply"), "Applying…");
+  try {
+    await save();
+    $("log").textContent = "Applying…";
+    const result = await api("/api/apply", { dept });
+    state = result.state;
+    $("log").textContent = result.log || "(no output)";
+    renderDepartment();
+    await refreshOverview();
+    banner(result.ok ? "Applied. Start a new Hermes session to use the changes." : "Apply finished with problems. See “Last apply” below.", result.ok ? "ok" : "bad");
+  } catch (error) { banner(error.message, "bad"); }
+  done();
+});
+
+$("refresh").addEventListener("click", async () => {
+  const done = busy($("refresh"), "Refreshing…");
+  await loadModels(true);
+  done();
+});
+
+$("key-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const key = $("key-input").value.trim();
+  if (!key) { banner("Paste a key first.", "bad"); $("key-input").focus(); return; }
+  keyAction({ key }, "Key saved.");
+});
+
+$("new-department").addEventListener("click", () => { $("new-error").textContent = ""; $("new-form").reset(); $("new-dialog").showModal(); });
+$("new-cancel").addEventListener("click", () => $("new-dialog").close());
+$("new-display").addEventListener("input", () => {
+  const slug = $("new-display").value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  $("new-name").value = slug;
+  $("new-prefix").value = slug.replace(/-/g, "").slice(0, 3);
+});
+$("new-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const result = await api("/api/departments", { name: $("new-name").value.trim(), title: $("new-display").value.trim(), prefix: $("new-prefix").value.trim() });
+    $("new-dialog").close();
+    company = result;
+    renderChips();
+    $("dirty").textContent = "";
+    await selectDepartment(result.created);
+    banner("Department created. Describe its roles below, then press “Save and apply to Hermes”.", "ok");
+  } catch (error) { $("new-error").replaceChildren(el("span", { class: "problem", text: error.message })); }
+});
+
+$("filter").addEventListener("input", renderCompare);
+$("config-form").addEventListener("input", markDirty);
+$("config-form").addEventListener("change", markDirty);
+
+async function loadModels(refresh) {
+  try {
+    const data = await api("/api/models?dept=" + encodeURIComponent(dept || "") + (refresh ? "&refresh=1" : ""));
+    models = data.models; bench = data.benchmarks || {};
+    modelIndex = Object.fromEntries(models.map((m) => [m.id, m]));
+    $("models-age").textContent = data.fetched_at
+      ? "Model list and prices from OpenRouter, fetched " + new Date(data.fetched_at * 1000).toLocaleString() + "."
+      : "The model list could not be loaded.";
+    if (data.stale_reason) banner(data.stale_reason, "warn");
+    renderModels();
+    if (state) rerenderKeepingEdits();
+  } catch (error) { banner("Could not load the model list: " + error.message, "warn"); }
+}
+
+(async function start() {
+  try {
+    await refreshOverview();
+    const wanted = new URLSearchParams(location.search).get("dept");
+    const names = company.departments.map((item) => item.name);
+    const first = names.includes(wanted) ? wanted : names[0];
+    if (first) await selectDepartment(first);
+    else banner("There is no department yet. Add one to begin.", "warn");
+  } catch (error) { banner(error.message, "bad"); }
+})();
+</script>
+</body>
+</html>

@@ -10,3 +10,6 @@ services/afm-helper/.build/
 # Knowledge binaries live on disk only (back up with Time Machine / iCloud)
 knowledge/**/*.pdf
 knowledge/**/*.PDF
+
+# Departments (departments/): keys stay out of git
+departments/.env

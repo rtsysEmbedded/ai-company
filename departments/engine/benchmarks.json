@@ -1,0 +1,32 @@
+{
+  "note": "General-purpose scores shown for every department. Scores as shown on the source pages on the dates given, mapped to OpenRouter model ids. They were read through a page summariser, not copied by hand from the tables, so check the source before relying on a single number.",
+  "benchmarks": {
+    "agentic": {
+      "label": "Agentic",
+      "what": "BenchLM composite of 23 agent benchmarks (tool calling, terminal, browsing). 0-100; higher is better.",
+      "date": "2026-10-01",
+      "source": "https://benchlm.ai/agentic",
+      "scores": {
+        "anthropic/claude-opus-5.5": 88.1,
+        "anthropic/claude-fable-5.1": 78.9,
+        "anthropic/claude-opus-5": 77.6,
+        "anthropic/claude-fable-5": 74.0,
+        "openai/gpt-6-astra": 70.7,
+        "x-ai/grok-4.6": 68.1,
+        "anthropic/claude-sonnet-5.5": 68.0,
+        "openai/gpt-5.6-sol": 68.0,
+        "moonshotai/kimi-k3": 67.8,
+        "z-ai/glm-5.3": 67.4,
+        "qwen/qwen3.8-max-0902": 65.4,
+        "google/gemini-3.8-flash": 65.3,
+        "anthropic/claude-sonnet-5": 64.6,
+        "deepseek/deepseek-v4.1-flash": 61.1,
+        "openai/gpt-6-sol": 59.1,
+        "x-ai/grok-4.5": 56.5,
+        "openai/gpt-5.6-luna": 55.1,
+        "google/gemini-3.5-flash": 50.4
+      },
+      "unit": ""
+    }
+  }
+}

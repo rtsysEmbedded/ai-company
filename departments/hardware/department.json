@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "name": "Hardware Development",
+  "provider": "openrouter",
+  "projects_dir": "~/Hardware_Projects",
+  "routing": {
+    "lead": "hw-lead",
+    "reviewer": "hw-review",
+    "review": "changes",
+    "task_timeout": "60m",
+    "review_scope": "a design (schematic, board, CAD part, firmware)"
+  },
+  "roles": {
+    "hw-lead": {
+      "title": "Hardware lead",
+      "enabled": true,
+      "model": "anthropic/claude-opus-5.5",
+      "fallback": "x-ai/grok-4.7",
+      "effort": "high",
+      "tools": [
+        "kanban",
+        "kicad",
+        "freecad"
+      ],
+      "needs": [
+        "tools",
+        "image",
+        "pdf"
+      ],
+      "description": "Hardware lead. Turns a product idea into requirements and an architecture, chooses the key parts, splits the work into tasks for the hardware specialists and checks the result. Talk to this one."
+    },
+    "hw-research": {
+      "title": "Component researcher",
+      "enabled": true,
+      "model": "google/gemini-3.8-flash",
+      "fallback": "anthropic/claude-sonnet-5.5",
+      "effort": "medium",
+      "tools": [],
+      "needs": [
+        "tools",
+        "pdf"
+      ],
+      "description": "Component and datasheet research - finds parts that meet a spec, reads datasheets and application notes, extracts pinouts, ratings and reference circuits with page references."
+    },
+    "hw-schematic": {
+      "title": "Schematic engineer",
+      "enabled": true,
+      "model": "anthropic/claude-sonnet-5.5",
+      "fallback": "x-ai/grok-4.7",
+      "effort": "high",
+      "tools": [
+        "kicad"
+      ],
+      "needs": [
+        "tools",
+        "image",
+        "pdf"
+      ],
+      "description": "Electronics design - circuit design and KiCad schematics from a spec and part list, with a clean ERC. Decoupling, protection, connectors, power tree."
+    },
+    "hw-layout": {
+      "title": "PCB layout engineer",
+      "enabled": true,
+      "model": "x-ai/grok-4.7",
+      "fallback": "anthropic/claude-sonnet-5.5",
+      "effort": "high",
+      "tools": [
+        "kicad"
+      ],
+      "needs": [
+        "tools",
+        "image"
+      ],
+      "description": "PCB layout in KiCad - board outline, placement, routing, ground pours, with a clean DRC and renders. Exports Gerbers."
+    },
+    "hw-mech": {
+      "title": "Mechanical engineer",
+      "enabled": true,
+      "model": "anthropic/claude-sonnet-5.5",
+      "fallback": "openai/gpt-6.1-sol",
+      "effort": "high",
+      "tools": [
+        "freecad",
+        "kicad"
+      ],
+      "needs": [
+        "tools",
+        "image"
+      ],
+      "description": "Mechanical CAD in FreeCAD - enclosures, brackets, mounts and fixtures that fit the board, verified by measurement, exported as STEP and STL."
+    },
+    "hw-review": {
+      "title": "Design reviewer",
+      "enabled": true,
+      "model": "openai/gpt-6.1-sol",
+      "fallback": "anthropic/claude-opus-5.5",
+      "effort": "high",
+      "tools": [
+        "kicad",
+        "freecad"
+      ],
+      "needs": [
+        "tools",
+        "image",
+        "pdf"
+      ],
+      "description": "Independent design review - re-runs ERC/DRC and measurements, checks schematics against datasheets and boards against the schematic and the mechanics. Approves or returns work with concrete fixes."
+    },
+    "hw-docs": {
+      "title": "Documentation and release",
+      "enabled": true,
+      "model": "deepseek/deepseek-v4.1-flash",
+      "fallback": "google/gemini-3.8-flash",
+      "effort": "low",
+      "tools": [
+        "kicad"
+      ],
+      "needs": [
+        "tools"
+      ],
+      "description": "Documentation and release files - BOM, assembly notes, pinout tables, README, and the manufacturing package (Gerbers, position file, STEP) collected in one folder. Cheapest."
+    }
+  },
+  "task_tag": "hw"
+}

@@ -1,0 +1,25 @@
+{
+  "title": "555 LED blinker",
+  "rev": "1",
+  "components": [
+    {"ref": "U1", "symbol": "Timer:NE555P", "value": "NE555P", "footprint": "Package_DIP:DIP-8_W7.62mm"},
+    {"ref": "R1", "symbol": "Device:R", "value": "10k", "footprint": "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"},
+    {"ref": "R2", "symbol": "Device:R", "value": "47k", "footprint": "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"},
+    {"ref": "R3", "symbol": "Device:R", "value": "470", "footprint": "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"},
+    {"ref": "C1", "symbol": "Device:C_Polarized", "value": "10u", "footprint": "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm"},
+    {"ref": "C2", "symbol": "Device:C", "value": "10n", "footprint": "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm"},
+    {"ref": "D1", "symbol": "Device:LED", "value": "RED", "footprint": "LED_THT:LED_D5.0mm"},
+    {"ref": "J1", "symbol": "Connector_Generic:Conn_01x02", "value": "5-12V", "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"},
+    {"ref": "#FLG01", "symbol": "power:PWR_FLAG"},
+    {"ref": "#FLG02", "symbol": "power:PWR_FLAG"}
+  ],
+  "nets": {
+    "VCC": ["J1.1", "U1.8", "U1.4", "R1.1", "#FLG01.1"],
+    "GND": ["J1.2", "U1.1", "C1.2", "C2.2", "D1.1", "#FLG02.1"],
+    "DISCH": ["U1.7", "R1.2", "R2.1"],
+    "THRES": ["U1.6", "U1.2", "R2.2", "C1.1"],
+    "CONT": ["U1.5", "C2.1"],
+    "OUT": ["U1.3", "R3.1"],
+    "LED_A": ["R3.2", "D1.2"]
+  }
+}

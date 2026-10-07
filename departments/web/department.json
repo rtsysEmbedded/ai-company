@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "name": "Web Development",
+  "provider": "openrouter",
+  "projects_dir": "~/Web_Projects",
+  "task_tag": "web",
+  "routing": {
+    "lead": "web-lead",
+    "reviewer": "web-review",
+    "review": "changes",
+    "review_scope": "code, a design or a page",
+    "task_timeout": "45m"
+  },
+  "roles": {
+    "web-lead": {
+      "title": "Web lead",
+      "enabled": true,
+      "model": "deepseek/deepseek-v4-pro-0813",
+      "fallback": "deepseek/deepseek-v4-pro-0813",
+      "effort": "high",
+      "tools": [
+        "kanban",
+        "kb",
+        "modern-web-guidance"
+      ],
+      "needs": [
+        "tools",
+        "image"
+      ],
+      "description": "Web lead. Turns a request for a web panel or site into a brief, an architecture and an API contract, splits the work into tasks for the web specialists and checks the result in the browser. Talk to this one."
+    },
+    "web-design": {
+      "title": "UX and UI designer",
+      "enabled": true,
+      "model": "deepseek/deepseek-v4-pro-0813",
+      "fallback": "deepseek/deepseek-v4-pro-0813",
+      "effort": "high",
+      "tools": [
+        "modern-web-guidance"
+      ],
+      "needs": [
+        "tools",
+        "image"
+      ],
+      "description": "UX and UI design - information architecture, screen flows, the design system (colour, type, spacing tokens, light and dark themes) and a written spec per screen with every state. Reads screenshots and mockups. Does not write application code."
+    },
+    "web-frontend": {
+      "title": "Frontend engineer",
+      "enabled": true,
+      "model": "deepseek/deepseek-v4-pro-0813",
+      "fallback": "x-ai/grok-4.7",
+      "effort": "high",
+      "tools": [
+        "kb",
+        "modern-web-guidance"
+      ],
+      "needs": [
+        "tools",
+        "image"
+      ],
+      "description": "Frontend - React, TypeScript, Vite and Tailwind. Builds pages and components from the design spec and the API contract, with loading, empty and error states, keyboard access and responsive layout. Checks the result in the browser."
+    },
+    "web-backend": {
+      "title": "Backend engineer",
+      "enabled": true,
+      "model": "z-ai/glm-5.3",
+      "fallback": "deepseek/deepseek-v4-pro-0813",
+      "effort": "high",
+      "tools": [
+        "kb"
+      ],
+      "needs": [
+        "tools"
+      ],
+      "description": "Backend - the API, data model, authentication and integration with the project the panel controls (FastAPI or Node, SQLite or Postgres). Implements the API contract with validation and tests."
+    },
+    "web-qa": {
+      "title": "QA engineer",
+      "enabled": true,
+      "model": "google/gemini-3.8-flash",
+      "fallback": "deepseek/deepseek-v4-pro-0813",
+      "effort": "medium",
+      "tools": [
+        "modern-web-guidance"
+      ],
+      "needs": [
+        "tools",
+        "image"
+      ],
+      "description": "Testing - unit and component tests (Vitest), end-to-end tests (Playwright), accessibility and responsive checks in a real browser, build and lint. Reports defects with steps to reproduce. Also writes the README and run instructions."
+    },
+    "web-review": {
+      "title": "Web reviewer",
+      "enabled": true,
+      "model": "deepseek/deepseek-v4-pro-0813",
+      "fallback": "deepseek/deepseek-v4-pro-0813",
+      "effort": "high",
+      "tools": [
+        "modern-web-guidance"
+      ],
+      "needs": [
+        "tools",
+        "image"
+      ],
+      "description": "Independent review - reads the diff, runs the build and tests, opens the pages in a browser, and checks code, design and security against the brief. Approves or returns work with concrete fixes."
+    }
+  }
+}

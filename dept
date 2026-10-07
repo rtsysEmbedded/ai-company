@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Departments of the AI company (hardware, and any you add). Run without arguments for help.
+# The software department is managed by team.yaml and scripts/apply_team.py, not by this command.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENGINE="$ROOT/departments/engine"
+PY="$(command -v python3 || true)"
+[ -n "$PY" ] || { echo "ERROR: python3 is required" >&2; exit 1; }
+case "${1:-help}" in
+  ui|open) shift; exec "$PY" "$ENGINE/ui/server.py" "$@" ;;
+  service) shift; exec bash "$ENGINE/service.sh" "$@" ;;
+  help|-h|--help)
+    cat <<USAGE
+Usage: ./dept <command>
+
+  open                      open the web interface (all departments) in the browser
+  list                      the departments and their state
+  status [DEPARTMENT]       what is configured and what Hermes actually has
+  apply [DEPARTMENT]        create or update the Hermes profiles (all departments if none is named)
+  validate [DEPARTMENT]     check the configuration
+  new NAME --title T --prefix P   create a new department from the template
+  models --refresh          update the OpenRouter model list and prices
+  remove DEPARTMENT         delete that department's Hermes profiles
+  service install|uninstall|status   the web interface's background service
+USAGE
+    ;;
+  *) exec "$PY" "$ENGINE/dept.py" "$@" ;;
+esac
