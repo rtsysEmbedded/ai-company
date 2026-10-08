@@ -381,15 +381,17 @@ def build_router(auth) -> APIRouter:
             text = goal_block(goal) + text
         routing = _team().get("routing") or {}
         reviewer = routing.get("reviewer", "reviewer")
+        wants_review = body.review and info["dept"] == "software" and profile != reviewer
         if _is_lead(info):
             text += LEAD_TASK
-        elif body.review and info["dept"] == "software" and profile != reviewer:
+        elif wants_review:
             text += f"\n\nWhen done, call kanban_request_review with reviewer={reviewer}."
         else:
-            text += "\n\nThis is a direct task from the user: when done, finish it with kanban_complete and a short summary. No review is needed."
+            text += "\n\nThis is a direct task from the user. No review is needed."
         cmd = ["hermes", "kanban", "create", title, "--assignee", profile, "--body", text.strip(), "--created-by", "panel",
                "--max-runtime", f"{max(5, min(body.timeout_minutes, 240))}m"]
-        if not _is_lead(info):   # Hermes' goal loop: a specialist that stops early is told to go on and to close the task
+        # Not with a review line in the body: the loop's judge reads the body as the goal and refuses the review call it asks for.
+        if not _is_lead(info) and not wants_review:   # Hermes' goal loop: a specialist that stops early is told to go on and to close the task
             cmd += ["--goal", "--goal-max-turns", str(getattr(activity_api.engine, "GOAL_TURNS", 6))]
         if folder:
             cmd += ["--workspace", f"dir:{folder}"]

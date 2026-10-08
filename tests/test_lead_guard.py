@@ -69,6 +69,8 @@ def main():
           and not guard("tool_call", {"calls": [{"name": "mcp__kicad__kicad_info", "arguments": {}}]})[0])
     blocked, reason = guard("kanban_create", {"title": "x", "assignee": "hw-schematic"})
     check("a task for a specialist needs the goal loop", blocked and "goal_mode: true" in reason, reason)
+    blocked, reason = guard("kanban_create", {"title": "x", "assignee": "hw-schematic", "goal_mode": True, "body": "Draw it. When done, call kanban_request_review with reviewer=hw-review."})
+    check("a body must not ask for the review", blocked and "review instruction" in reason, reason)
     check("the same in a chat with the user", guard("kanban_create", {"title": "x", "assignee": "hw-schematic"}, task=None)[0])
     check("a task for another lead or for itself does not", not guard("kanban_create", {"title": "x", "assignee": "sw-lead"})[0]
           and not guard("kanban_create", {"title": "check", "assignee": "hw-lead"})[0])
@@ -99,6 +101,38 @@ def main():
     check("the lead's own check-and-report task completes without handing out work", not guard("kanban_complete", {"summary": "report"}, task="t_check", run="9")[0])
     con.close()
     check("after handing out work the task completes at once", not guard("kanban_complete", {"summary": "plan"}, run="8")[0])
+    # A planning run that is started again must not put the same tasks on the board twice.
+    con = sqlite3.connect(DB)
+    con.execute("ALTER TABLE tasks ADD COLUMN status TEXT")
+    con.execute("ALTER TABLE tasks ADD COLUMN assignee TEXT")
+    con.execute("CREATE TABLE task_events (task_id TEXT, kind TEXT, payload TEXT)")
+    con.execute("INSERT INTO tasks VALUES ('t_job', 'panel', ?, ?, 'job', 'running', 'hw-lead')", (now - 900, now - 800))
+    con.execute("INSERT INTO tasks VALUES ('t_first', 'hw-lead', ?, NULL, '[hw] car: Draw the  schematic', 'done', 'hw-schematic')", (now - 700,))
+    con.execute("INSERT INTO task_events VALUES ('t_first', 'created', ?)", (json.dumps({"assignee": "hw-schematic", "creator_task_id": "t_job"}),))
+    con.execute("INSERT INTO task_runs VALUES (20, 't_job', ?, NULL, NULL)", (now - 30,))   # the second run of the job
+    con.commit(); con.close()
+    spec = {"assignee": "hw-schematic", "goal_mode": True, "goal_max_turns": 6}
+    blocked, reason = guard("kanban_create", {"title": "[hw] car: draw the schematic", **spec}, task="t_job", run="20")
+    check("a task that already exists in this job is not created again", blocked and "already exists: t_first" in reason, reason)
+    blocked, reason = guard("kanban_create", {"title": "[hw] car: produce the schematic", **spec}, task="t_job", run="20")
+    check("a repeated planning run is shown what is already on the board", blocked and "already planned" in reason and "t_first" in reason, reason)
+    check("a task that is really missing can still be added", not guard("kanban_create", {"title": "[hw] car: write the docs", "assignee": "hw-research", "goal_mode": True}, task="t_job", run="20")[0])
+    check("the repeated run can complete with the earlier tasks", not guard("kanban_complete", {"summary": "plan"}, task="t_job", run="20")[0])
+    check("a first planning run is not disturbed", not guard("kanban_create", {"title": "new", **spec})[0])
+
+    # Every other agent: the small guard for its board calls.
+    with open(os.path.join(HOME, "lead_guard.json")) as handle:
+        lead_config = handle.read()
+    with open(os.path.join(HOME, "lead_guard.json"), "w") as handle:
+        json.dump({"specialist": "hw-schematic", "reviewer": "hw-review"}, handle)
+    blocked, reason = guard("kanban_request_review", {"summary": "done"})
+    check("a review request must name the reviewer", blocked and 'reviewer: "hw-review"' in reason, reason)
+    check("with the reviewer it passes", not guard("kanban_request_review", {"summary": "done", "reviewer": "hw-review"})[0])
+    check("a specialist's misspelled field is refused too", guard("kanban_complete", {"summary_x": "done"})[0])
+    check("a specialist keeps its work tools", not guard("terminal", {"command": "ls"})[0] and not guard("kanban_complete", {"summary": "done"})[0])
+    with open(os.path.join(HOME, "lead_guard.json"), "w") as handle:
+        handle.write(lead_config)
+
     # Hermes strips HERMES_KANBAN_TASK from a hook's environment: the task is found through the worker's pid.
     con = sqlite3.connect(DB)
     con.execute("INSERT INTO task_runs VALUES (11, 't_lead01', ?, ?, NULL)", (now, os.getpid()))

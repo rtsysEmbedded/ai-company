@@ -313,10 +313,18 @@ def software_lead():
 GUARD_SCRIPT = os.path.join(ENGINE, "lead_guard.py")
 
 
-def guard_hook():
-    """The hooks.pre_tool_call entry for a lead's profile."""
+def guard_hook(lead=True):
+    """The hooks.pre_tool_call entry for a profile: a lead's guard sees every tool call, a specialist's only its board calls."""
     python = os.environ.get("DEPT_PYTHON") or shutil.which("python3") or sys.executable
-    return {"matcher": ".*", "command": "%s %s" % (python, GUARD_SCRIPT), "timeout": 10}
+    return {"matcher": ".*" if lead else "kanban_.*", "command": "%s %s" % (python, GUARD_SCRIPT), "timeout": 10}
+
+
+def guard_config(config, role):
+    """The guard's settings for one role: the team for the lead, the reviewer to name for everyone else."""
+    routing = config.get("routing") or {}
+    if role == routing.get("lead"):
+        return guard_team(config)
+    return {"specialist": role, "reviewer": routing.get("reviewer") if routing.get("review", "changes") != "off" else ""}
 
 
 def guard_team(config):
@@ -341,6 +349,10 @@ INTERFACES = "docs/interfaces.md"    # where teams write down what they agreed o
 GOAL_TURNS = 6    # turns a specialist gets in Hermes' goal loop before its task is blocked (lead_guard.py checks the same number)
 GOAL_FIELD = ("- `goal_mode: true` and `goal_max_turns: %d` on every task for a specialist. With it a specialist that stops "
               "early is told to go on and to close the task; without it the whole run is repeated." % GOAL_TURNS)
+# The review is the specialist's own rule, never a line in the task body: the goal loop's judge reads the body as the
+# goal and refuses a review call that the body itself asks for ("not called yet").
+NO_REVIEW_LINE = ("- Do not write a review instruction into a body. Each specialist asks **%s** for the review itself, by its own "
+                  "rules, when it produced or changed something.")
 BLOCK_LINE = ("If you cannot go on (missing information, a missing tool, a decision that is not yours), use `kanban_block` "
               "with `kind: needs_input` and one precise question or the exact thing that is missing.")
 
@@ -653,8 +665,7 @@ def routing_rules(role, config):
             GOAL_FIELD,
         ]
         if review != "off":
-            scope = "every task" if review == "all" else "every task that produces or changes %s" % (routing.get("review_scope") or "a deliverable")
-            lines.append('- For %s, end the body with: "When done, call kanban_request_review with reviewer=%s."' % (scope, reviewer))
+            lines.append(NO_REVIEW_LINE % reviewer)
         lines.append("After creating the tasks, tell the user the plan (task ids, who does what, in which order). Use "
                      "`kanban_list` and `kanban_show` to report progress when asked. Answer simple questions yourself, without the board.")
         lines += closing_rules(lead)
@@ -678,8 +689,10 @@ def routing_rules(role, config):
         lines.append("You are the reviewer. Approve with `kanban_complete` (say what you verified), or return the work "
                      "with `kanban_request_changes` and concrete fixes.")
     elif review != "off":
-        lines.append("If the task body asks for a review, finish with `kanban_request_review` (reviewer=%s) and your "
-                     "handoff. Otherwise finish with `kanban_complete` and your handoff." % reviewer)
+        scope = "Always" if review == "all" else "If your task produced or changed %s," % (routing.get("review_scope") or "a deliverable")
+        lines.append("%s finish with `kanban_request_review`, with `reviewer: %s` and your handoff as `summary`; the task body "
+                     "does not have to ask for it. If you only looked, read or answered, finish with `kanban_complete` and "
+                     "your handoff." % (scope, reviewer))
     else:
         lines.append("Finish with `kanban_complete` and your handoff.")
     lines.append(BLOCK_LINE + " Your lead **%s** gets it and answers or gives the work to someone else." % lead)
@@ -787,8 +800,8 @@ def role_differences(department, role, config, env=None):
             diffs.append("%s skill missing" % tool)
     if "kanban" in tools and not actual["kanban"]:
         diffs.append("task board tools not enabled")
-    if role == (config.get("routing") or {}).get("lead") and not guard_installed(profile_dir(role), guard_team(config)):
-        diffs.append("lead guard not installed")
+    if not guard_installed(profile_dir(role), guard_config(config, role)):
+        diffs.append("guard not installed" if role != (config.get("routing") or {}).get("lead") else "lead guard not installed")
     if actual["soul_hash"] != hashlib.sha1(soul_block(department, role, config).encode("utf-8")).hexdigest():
         diffs.append("role rules out of date")
     wanted_key = key_for(role, department, env)
@@ -898,11 +911,11 @@ def apply(department, config, only=None, dry_run=False, log=print):
         hermes(p + ["config", "set", "tool_loop_guardrails.hard_stop_enabled", "true"], what="set the loop stop")
         if "kanban" in tools:
             hermes(p + ["tools", "enable", "kanban"], what="enable task board tools")
-        if role == (config.get("routing") or {}).get("lead"):
-            hermes(p + ["config", "set", "hooks.pre_tool_call", json.dumps([guard_hook()])], what="install the lead guard")
-            hermes(p + ["config", "set", "hooks_auto_accept", "true"], what="accept the lead guard")
-            with open(os.path.join(profile_dir(role), "lead_guard.json"), "w", encoding="utf-8") as handle:
-                json.dump(guard_team(config), handle, indent=1)
+        is_lead = role == (config.get("routing") or {}).get("lead")
+        hermes(p + ["config", "set", "hooks.pre_tool_call", json.dumps([guard_hook(is_lead)])], what="install the guard")
+        hermes(p + ["config", "set", "hooks_auto_accept", "true"], what="accept the guard")
+        with open(os.path.join(profile_dir(role), "lead_guard.json"), "w", encoding="utf-8") as handle:
+            json.dump(guard_config(config, role), handle, indent=1)
         actual = actual_state(role)
         for tool, present in actual["mcp"].items():
             tool_spec, wanted = registry[tool], tool in tools

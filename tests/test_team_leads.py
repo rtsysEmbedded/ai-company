@@ -84,7 +84,7 @@ def main():
     check("the software lead has the specialists, without the manager or itself",
           "# Your team" in lead and "**backend**:" in lead and "**manager**" not in lead and "**sw-lead**:" not in lead)
     check("the software lead keeps review, security review and escalation",
-          "kanban_request_review with reviewer=reviewer" in lead and "review task for **security**" in lead and "**architect**" in lead)
+          "Do not write a review instruction into a body" in lead and "**reviewer**" in lead and "review task for **security**" in lead and "**architect**" in lead)
     check("the software lead plans a board task and ends it", "# When a task on the board is assigned to you" in lead and "kanban_complete" in lead)
     check("the software lead knows the other leads and how to reach them",
           "# Other teams" in lead and "**hw-lead** leads" in lead and "**web-lead** leads" in lead

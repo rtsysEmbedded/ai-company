@@ -243,7 +243,9 @@ def routing_rules(role, team):
         ]
         if lead and engine():
             lines.append(engine().GOAL_FIELD)
-        if review_on:
+        if review_on and lead and engine():
+            lines.append(engine().NO_REVIEW_LINE % r["reviewer"])
+        elif review_on:
             scope = "every task" if r["review"] == "all" else "every task that changes code"
             lines.append(f"- For {scope}, end the body with: \"When done, call kanban_request_review with "
                          f"reviewer={r['reviewer']}.\"")
@@ -284,8 +286,9 @@ def routing_rules(role, team):
         lines.append("You review for security. Do not change code unless the task says so. Report findings with "
                      "severity; approve with `kanban_complete` or return with `kanban_request_changes`.")
     elif review_on:
-        lines.append(f"If you changed code, finish with `kanban_request_review` (reviewer={r['reviewer']}) and a "
-                     "summary of what you changed and how you tested it. Otherwise finish with `kanban_complete`.")
+        when = "Always" if r["review"] == "all" else "If you changed code,"
+        lines.append(f"{when} finish with `kanban_request_review`, with `reviewer: {r['reviewer']}` and a summary of what you "
+                     "changed and how you tested it; the task body does not have to ask for it. Otherwise finish with `kanban_complete`.")
     if role == r["escalate_to"]:
         lines.append("Tasks reach you after other agents failed. Read the task history and comments first, "
                      "find the root cause, and explain in your handoff why earlier attempts failed.")
@@ -349,18 +352,32 @@ def write_env(pdir, is_default, key, dry):
         os.chmod(path, 0o600)
 
 
-def install_lead_guard(pdir, cfg, role, team, dry):
-    """The department engine's lead guard for the software lead: on a board task it plans and hands out, it does not code."""
+def install_guard(pdir, cfg, role, team, dry):
+    """The department engine's guard (lead_guard.py). The software lead gets the full guard: on a board task it plans
+    and hands out, it does not code. Every other agent gets the small one for its board calls: exact field names, and
+    a review request that names the reviewer."""
     script = os.path.join(ROOT, "departments", "engine", "lead_guard.py")
     if not os.path.isfile(script):
         return
+    is_lead = role == team_lead(team)
     hooks = [h for h in (cfg.get("hooks") or {}).get("pre_tool_call") or [] if script not in str(h.get("command"))]
-    cfg.setdefault("hooks", {})["pre_tool_call"] = hooks + [{"matcher": ".*", "command": f"{shutil.which('python3') or sys.executable} {script}", "timeout": 10}]
+    cfg.setdefault("hooks", {})["pre_tool_call"] = hooks + [{"matcher": ".*" if is_lead else "kanban_.*",
+                                                            "command": f"{shutil.which('python3') or sys.executable} {script}", "timeout": 10}]
     cfg["hooks_auto_accept"] = True
-    members = [{"name": n, "title": s.get("title") or n, "tools": "code, files and terminal"} for n, s in team["roles"].items()
-               if n not in ("manager", role) and s.get("enabled", True) and s.get("routable", True) and n in available(team)]
+    r = routing(team)
+    if is_lead:
+        members = [{"name": n, "title": s.get("title") or n, "tools": "code, files and terminal"} for n, s in team["roles"].items()
+                   if n not in ("manager", role) and s.get("enabled", True) and s.get("routable", True) and n in available(team)]
+        settings = {"lead": role, "team": members}
+    else:
+        settings = {"specialist": role, "reviewer": r["reviewer"] if r["review"] != "off" and spec_routable(team, role) else ""}
     if not dry:
-        json.dump({"lead": role, "team": members}, open(os.path.join(pdir, "lead_guard.json"), "w", encoding="utf-8"), indent=1)
+        json.dump(settings, open(os.path.join(pdir, "lead_guard.json"), "w", encoding="utf-8"), indent=1)
+
+
+def spec_routable(team, role):
+    """True for the roles that get tasks from the lead (not the manager, not the general assistant)."""
+    return role != "manager" and (team["roles"].get(role) or {}).get("routable", True)
 
 
 def write_config(pdir, role, spec, team, dry):
@@ -388,7 +405,8 @@ def write_config(pdir, role, spec, team, dry):
         names = cfg.setdefault("platform_toolsets", {}).setdefault("cli", ["hermes-cli"])
         if "kanban" not in names:
             names.append("kanban")
-        install_lead_guard(pdir, cfg, role, team, dry)
+
+    install_guard(pdir, cfg, role, team, dry)
     if not dry:
         yaml.safe_dump(cfg, open(path, "w"), sort_keys=False, allow_unicode=True)
 

@@ -6,7 +6,11 @@ user the lead keeps all its tools, and only the tasks it creates for specialists
 run commands, change files other than its notes, or use a department tool that produces work, and it
 cannot finish a task without having given work to its team. Every refusal tells it whom to give the work to.
 
-Installed by `dept apply` / `apply_team.py`, which also write lead_guard.json (the team) into the profile.
+Every other agent gets the same script as a small guard for its board calls only: a misspelled field name is
+refused with the right one, and a review request must name the reviewer.
+
+Installed by `dept apply` / `apply_team.py`, which also write lead_guard.json (the team, or for a specialist
+its name and the reviewer) into the profile.
 Fails open: if anything here goes wrong, the tool call is allowed.
 """
 import json
@@ -107,6 +111,70 @@ def board_task():
         con.close()
 
 
+def job_tasks(task_id):
+    """The tasks already created from this board task, in any of its runs: [(id, title, assignee, status)]."""
+    con = _board()
+    if not con:
+        return []
+    try:
+        return con.execute("SELECT t.id, t.title, t.assignee, t.status FROM task_events e JOIN tasks t ON t.id = e.task_id "
+                           "WHERE e.kind = 'created' AND e.payload LIKE ? AND t.status != 'archived' ORDER BY t.created_at",
+                           ('%%"creator_task_id": "%s"%%' % task_id,)).fetchall()
+    except sqlite3.Error:
+        return []
+    finally:
+        con.close()
+
+
+def duplicate_reason(args, task_id, run_id):
+    """A reason to refuse a kanban_create that repeats work this job already handed out, or None.
+
+    A lead's planning run can be started a second time (a crash, a stopped loop). It then plans again and would put
+    every task on the board twice."""
+    existing = job_tasks(task_id)
+    if not existing:
+        return None
+    title = " ".join(str((args or {}).get("title") or "").lower().split())
+    listing = "; ".join("%s \"%s\" for %s (%s)" % row for row in existing[:12])
+    same = [row for row in existing if " ".join(str(row[1] or "").lower().split()) == title]
+    if same:
+        return ("This task already exists: %s. Do not create it again. Tasks of this job so far: %s." % (same[0][0], listing))
+    if created_tasks_in_run(task_id, run_id) == 0 and first_time(task_id, run_id, "replan"):
+        return ("This job was already planned in an earlier run; these tasks are on the board: %s. Do not create them a second "
+                "time. If the plan is complete, finish now with kanban_complete and list these ids. Only if a task is really "
+                "missing, call kanban_create again for that one task." % listing)
+    return None
+
+
+def created_tasks_in_run(task_id, run_id):
+    """How many of this job's tasks were created since the current run started (0 when unknown)."""
+    con = _board()
+    if not con:
+        return 0
+    try:
+        row = con.execute("SELECT started_at FROM task_runs WHERE id = ?", (run_id,)).fetchone() if run_id else None
+        since = (row[0] if row and row[0] else 0) - 5
+        return con.execute("SELECT COUNT(*) FROM task_events e JOIN tasks t ON t.id = e.task_id WHERE e.kind = 'created' "
+                           "AND e.payload LIKE ? AND t.created_at >= ?", ('%%"creator_task_id": "%s"%%' % task_id, since)).fetchone()[0]
+    except sqlite3.Error:
+        return 0
+    finally:
+        con.close()
+
+
+def review_reason(name, args, config):
+    """A reason to refuse a specialist's review request that names no reviewer, or None.
+
+    Without the reviewer the task stays with the specialist, and the board starts the specialist again as its own reviewer."""
+    reviewer = config.get("reviewer")
+    if name != "kanban_request_review" or not reviewer or config.get("specialist") == reviewer:
+        return None
+    if str((args or {}).get("reviewer") or "") == reviewer:
+        return None
+    return ("Name the reviewer: call kanban_request_review again with `reviewer: \"%s\"` and the same summary. Without it "
+            "the review comes back to you instead of going to %s." % (reviewer, reviewer))
+
+
 def own_task(profile, task_id):
     """True for a task the lead may finish without handing out work: its own closing "check and report" task,
     a blocked specialist's question, or another lead's request (it may simply answer)."""
@@ -132,6 +200,9 @@ def goal_reason(args, config):
     if str(args.get("assignee") or "") == config.get("lead") and "check and report" in str(args.get("title") or "").lower() and not args.get("parents"):
         return ("A `check and report` task needs `parents`: the ids of the tasks it checks. Without them it starts before "
                 "that work is finished. Create it again with `parents`.")
+    if str(args.get("assignee") or "") in names and "kanban_request_review" in str(args.get("body") or ""):
+        return ("Take the review instruction out of the `body`. The specialist asks for the review itself, by its own rules; "
+                "a body that asks for it cannot pass the goal check. Create the task again without that line.")
     if str(args.get("assignee") or "") not in names or str(args.get("goal_mode")).lower() in ("true", "1"):
         return None
     return ("A task for a specialist needs `goal_mode: true` and `goal_max_turns: %d`: without it the specialist often stops "
@@ -204,9 +275,9 @@ def check(name, args, config, profile, task_id, run_id):
         return ("A missing tool or skill is not a reason for a lead to block: give the work to the specialist who has it. "
                 "%s If truly nobody in any team can do it, call kanban_block again and name exactly what is missing." % team)
     if name == "kanban_create":
-        return goal_reason(args, config)
+        return goal_reason(args, config) or duplicate_reason(args, task_id, run_id)
     if name == "kanban_complete":
-        count = created_tasks(profile, task_id, run_id)
+        count = created_tasks(profile, task_id, run_id) or len(job_tasks(task_id))   # work handed out in an earlier run counts
         if count == 0 and not own_task(profile, task_id) and first_time(task_id, run_id, "complete"):
             return ("You have not given any work to your team in this run. Create the tasks for your specialists with "
                     "kanban_create first, then complete with the plan. %s If this job really needs no specialist (a question "
@@ -224,6 +295,11 @@ def main():
         reason = field_reason(str(payload.get("tool_name") or ""), payload.get("tool_input"))
         if reason:
             block(reason)
+        if config.get("specialist"):   # a specialist's guard checks only how it talks to the board
+            reason = review_reason(str(payload.get("tool_name") or ""), payload.get("tool_input"), config)
+            if reason:
+                block(reason)
+            allow()
         if not task_id:   # in a chat the lead keeps all its tools; only the tasks it hands out are checked
             reason = goal_reason(payload.get("tool_input"), config) if payload.get("tool_name") == "kanban_create" else None
             if reason:
