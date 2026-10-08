@@ -342,8 +342,10 @@ def lessons():
     for f in sorted(os.listdir(LESSONS), reverse=True):
         if f.endswith(".md"):
             text = open(os.path.join(LESSONS, f), encoding="utf-8").read()
-            role = re.search(r"^author_role:\s*(.*)$", text, re.M)
-            out.append({"name": f, "role": role.group(1) if role else "", "text": text})
+            head = text.split("\n---", 1)[0] if text.startswith("---") else ""
+            field = lambda key: (re.search(r"^%s:\s*(.*)$" % key, head, re.M) or [None, ""])[1].strip().strip("'\"")
+            out.append({"name": f, "role": field("author_role"), "kind": field("kind") or "lesson", "title": field("title"),
+                        "project": field("project"), "task": field("task"), "date": field("date"), "text": text})
     return out
 
 

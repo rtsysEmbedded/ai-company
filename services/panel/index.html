@@ -328,7 +328,7 @@
           </div>
         </div>
       </div>
-      <div class="card"><h2>Lessons written by agents</h2><div id="lessons"></div></div>
+      <div class="card"><h2>Knowledge written by agents</h2><p class="muted" style="margin:0 0 8px">Lessons learned, known errors with their fix, how-to procedures, research with sources and decisions. Written by the lead when a job is closed; every agent finds them with a search before it starts.</p><div id="lessons"></div></div>
     </section>
 
     <section data-view="flow" hidden>
@@ -1853,6 +1853,7 @@ $("#backupFile").onchange = async e => {
 loaders["dept:backup"] = async () => { await loadDept(); await loadBackups(S.dept, S.d.config.name || S.dept, "roles, models, routing and rules"); };
 
 // ================= knowledge =================
+const KB = { kind: "" };
 loaders.knowledge = async () => {
   const s = await api("/api/kb/status");
   const job = s.reindex?.state === "running" ? `<span class="warn">reindexing…</span>` : s.reindex?.state === "done" ? `<span class="muted">last reindex ${esc(s.reindex.at)}: +${s.reindex.stats.added} ~${s.reindex.stats.updated} −${s.reindex.stats.removed}</span>` : "";
@@ -1863,7 +1864,13 @@ loaders.knowledge = async () => {
   loadLibrary();
   if (s.reindex?.state === "running") watchIndex();
   const ls = await api("/api/kb/lessons");
-  $("#lessons").innerHTML = ls.length ? ls.map(l => `<details class="hit"><summary><span class="mono">${esc(l.name)}</span> <span class="muted">by ${esc(l.role)}</span></summary><pre>${esc(l.text)}</pre><button class="btn danger" data-del="${esc(l.name)}" style="margin-top:8px">Delete</button></details>`).join("") : `<p class="muted">No lessons yet.</p>`;
+  // One list for every kind of note the agents write, with a filter per kind.
+  const KINDS = { lesson: "Lessons learned", error: "Known errors", howto: "How-to", research: "Research", decision: "Decisions" };
+  const kinds = [...new Set(ls.map(l => l.kind))], pick = kinds.includes(KB.kind) ? KB.kind : "";
+  const shown = ls.filter(l => !pick || l.kind === pick);
+  $("#lessons").innerHTML = ls.length ? `<p class="row"><span class="seg">${[["", `All ${ls.length}`], ...kinds.map(k => [k, `${KINDS[k] || k} ${ls.filter(l => l.kind === k).length}`])].map(([k, label]) => `<button type="button" data-kind="${esc(k)}" aria-pressed="${k === pick}">${esc(label)}</button>`).join("")}</span></p>`
+    + shown.map(l => `<details class="hit"><summary>${chip(l.kind === "error" ? "bad" : l.kind === "lesson" ? "ok" : "", KINDS[l.kind] || l.kind)} <b>${esc(l.title || l.name)}</b> <span class="muted">${l.project ? esc(l.project) + " · " : ""}${esc(l.date)} · by ${esc(l.role)}${l.task ? " · " + esc(l.task) : ""}</span></summary><pre>${esc(l.text)}</pre><button class="btn danger" data-del="${esc(l.name)}" style="margin-top:8px">Delete</button></details>`).join("") : `<p class="muted">Nothing written yet. A lead writes the lessons, errors, procedures and research of a job when it closes it.</p>`;
+  $$("#lessons [data-kind]").forEach(b => b.onclick = () => { KB.kind = b.dataset.kind; loaders.knowledge(); });
   $$("[data-del]").forEach(b => b.onclick = async () => {
     if (!await ask(`Delete lesson ${b.dataset.del}?`)) return;
     await api("/api/kb/lessons/" + b.dataset.del, { method: "DELETE" }); toast("Deleted"); loaders.knowledge();

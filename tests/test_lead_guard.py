@@ -14,8 +14,9 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GUARD = os.path.join(ROOT, "departments", "engine", "lead_guard.py")
 TMP = tempfile.mkdtemp(prefix="lead-guard-test-")
-HOME, DB = os.path.join(TMP, "profile"), os.path.join(TMP, "kanban.db")
+HOME, DB, NOTES = os.path.join(TMP, "profile"), os.path.join(TMP, "kanban.db"), os.path.join(TMP, "lessons")
 os.makedirs(HOME)
+os.makedirs(NOTES)
 
 
 def check(name, condition, detail=""):
@@ -30,7 +31,7 @@ check.failed = 0
 def guard(tool, args=None, task="t_lead01", run="7"):
     """(blocked, reason) for one tool call of the lead."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("HERMES_")}
-    env.update(HERMES_HOME=HOME, HERMES_KANBAN_DB=DB, HERMES_PROFILE="hw-lead", TMPDIR=TMP)
+    env.update(HERMES_HOME=HOME, HERMES_KANBAN_DB=DB, HERMES_PROFILE="hw-lead", TMPDIR=TMP, LEAD_GUARD_KNOWLEDGE=NOTES)
     if task:
         env.update(HERMES_KANBAN_TASK=task, HERMES_KANBAN_RUN_ID=run)
     r = subprocess.run([sys.executable, GUARD], input=json.dumps({"tool_name": tool, "tool_input": args or {}, "profile": "hw-lead"}),
@@ -43,14 +44,26 @@ def main():
     now = int(time.time())
     con = sqlite3.connect(DB)
     con.execute("CREATE TABLE tasks (id TEXT, created_by TEXT, created_at INTEGER, started_at INTEGER, title TEXT)")
-    con.execute("CREATE TABLE task_runs (id INTEGER, task_id TEXT, started_at INTEGER, worker_pid INTEGER, ended_at INTEGER)")
+    con.execute("CREATE TABLE task_runs (id INTEGER, task_id TEXT, started_at INTEGER, worker_pid INTEGER, ended_at INTEGER, summary TEXT)")
+    con.execute("CREATE TABLE task_links (parent_id TEXT, child_id TEXT)")
     con.execute("INSERT INTO tasks VALUES ('t_lead01', 'worker', ?, ?, 'job')", (now - 100, now - 60))
     con.execute("INSERT INTO tasks VALUES ('t_old', 'hw-lead', ?, NULL, 'old')", (now - 5000,))      # from an earlier run
-    con.execute("INSERT INTO task_runs VALUES (7, 't_lead01', ?, NULL, NULL)", (now - 60,))
+    con.execute("INSERT INTO task_runs (id, task_id, started_at) VALUES (7, 't_lead01', ?)", (now - 60,))
     con.commit()
     with open(os.path.join(HOME, "lead_guard.json"), "w") as handle:
         json.dump({"lead": "hw-lead", "team": [{"name": "hw-schematic", "title": "Schematic engineer", "tools": "kicad"},
                                                {"name": "hw-research", "title": "Researcher", "tools": "no special tools"}]}, handle)
+
+    spec = {"assignee": "hw-schematic", "goal_mode": True, "goal_max_turns": 6}
+    blocked, reason = guard("kanban_create", {"title": "first", **spec}, run="3")
+    check("before handing out work the lead is asked to search the knowledge base", blocked and "kb_search" in reason, reason)
+    check("asked once only: a second call passes (the knowledge tool may be down)", not guard("kanban_create", {"title": "first", **spec}, run="3")[0])
+    guard("tool_call", {"calls": [{"name": "mcp__kb__kb_search", "arguments": {"query": "car"}}]}, run="4")
+    check("after a search the work is handed out at once", not guard("kanban_create", {"title": "first", **spec}, run="4")[0])
+    for run in ("7", "8", "9", "10", "20"):
+        guard("mcp__kb__kb_search", {"query": "motor"}, run=run)
+        guard("mcp__kb__kb_search", {"query": "motor"}, task="t_job", run=run)
+        guard("mcp__kb__kb_search", {"query": "motor"}, task="t_check", run=run)
 
     blocked, reason = guard("terminal", {"command": "kicad-cli sch export netlist x"})
     check("a lead cannot run commands on a board task", blocked and "switched off" in reason, reason)
@@ -93,11 +106,38 @@ def main():
     check("a second complete is accepted (a job that needs no specialist)", not guard("kanban_complete", {"summary": "answered"})[0])
     con.execute("INSERT INTO tasks VALUES ('t_child', 'hw-lead', ?, NULL, 'child')", (now,))
     con.execute("INSERT INTO tasks VALUES ('t_check', 'hw-lead', ?, ?, 'check and report')", (now - 4000, now - 10))   # the lead's own closing task
-    con.execute("INSERT INTO task_runs VALUES (9, 't_check', ?, NULL, NULL)", (now + 100,))                     # nothing created in this run
+    con.execute("INSERT INTO task_runs (id, task_id, started_at) VALUES (9, 't_check', ?)", (now + 100,))                     # nothing created in this run
     con.commit()
     con.execute("INSERT INTO tasks VALUES ('t_req', 'sw-lead', ?, ?, '[request] car: which UART pins?')", (now - 50, now - 10))
     con.commit()
     check("a request from another lead can simply be answered", not guard("kanban_complete", {"summary": "GPIO 16/17"}, task="t_req", run="10")[0])
+    con = sqlite3.connect(DB)
+    con.execute("UPDATE task_runs SET started_at = ? WHERE id = 9", (now - 20,))
+    con.commit(); con.close()
+    blocked, reason = guard("kanban_complete", {"summary": "report"}, task="t_check", run="9")
+    check("a finished job is not closed before its knowledge is written", blocked and "kb_add" in reason and "lesson" in reason, reason)
+    with open(os.path.join(NOTES, "2026-10-08-car-lesson.md"), "w") as handle:
+        handle.write("---\nkind: lesson\n---\n")
+    con = sqlite3.connect(DB)
+    con.execute("INSERT INTO task_runs (id, task_id, started_at) VALUES (12, 't_check', ?)", (now - 20,))
+    con.commit(); con.close()
+    check("with a note written in this run the check-and-report task completes", not guard("kanban_complete", {"summary": "report"}, task="t_check", run="12")[0])
+    # What the handoffs name decides which notes are owed: sources -> a research note, a solved problem -> an error note.
+    con = sqlite3.connect(DB)
+    con.execute("INSERT INTO task_links VALUES ('t_work', 't_check')")
+    con.execute("INSERT INTO task_runs VALUES (30, 't_work', ?, NULL, ?, ?)", (now - 500, now - 400,
+                "Looked it up.\n\nSources:\nhttps://example.com/ds.pdf\n\nTools:\nweb_search\n\nErrors and fixes:\nnone"))
+    con.execute("INSERT INTO task_runs VALUES (13, 't_check', ?, NULL, NULL, NULL)", (now - 20,))
+    con.commit(); con.close()
+    blocked, reason = guard("kanban_complete", {"summary": "report"}, task="t_check", run="13")
+    check("sources in a handoff make a research note owed; no error note when nothing went wrong",
+          blocked and "`research` note" in reason and "`error` note" not in reason and "`lesson` for the job" not in reason, reason)
+    with open(os.path.join(NOTES, "2026-10-08-car-research.md"), "w") as handle:
+        handle.write("---\ntitle: x\nkind: research\n---\n")
+    con = sqlite3.connect(DB)
+    con.execute("INSERT INTO task_runs VALUES (14, 't_check', ?, NULL, NULL, NULL)", (now - 20,))
+    con.commit(); con.close()
+    check("with the research note written the job closes", not guard("kanban_complete", {"summary": "report"}, task="t_check", run="14")[0])
     check("the lead's own check-and-report task completes without handing out work", not guard("kanban_complete", {"summary": "report"}, task="t_check", run="9")[0])
     con.close()
     check("after handing out work the task completes at once", not guard("kanban_complete", {"summary": "plan"}, run="8")[0])
@@ -109,7 +149,7 @@ def main():
     con.execute("INSERT INTO tasks VALUES ('t_job', 'panel', ?, ?, 'job', 'running', 'hw-lead')", (now - 900, now - 800))
     con.execute("INSERT INTO tasks VALUES ('t_first', 'hw-lead', ?, NULL, '[hw] car: Draw the  schematic', 'done', 'hw-schematic')", (now - 700,))
     con.execute("INSERT INTO task_events VALUES ('t_first', 'created', ?)", (json.dumps({"assignee": "hw-schematic", "creator_task_id": "t_job"}),))
-    con.execute("INSERT INTO task_runs VALUES (20, 't_job', ?, NULL, NULL)", (now - 30,))   # the second run of the job
+    con.execute("INSERT INTO task_runs (id, task_id, started_at) VALUES (20, 't_job', ?)", (now - 30,))   # the second run of the job
     con.commit(); con.close()
     spec = {"assignee": "hw-schematic", "goal_mode": True, "goal_max_turns": 6}
     blocked, reason = guard("kanban_create", {"title": "[hw] car: draw the schematic", **spec}, task="t_job", run="20")
@@ -131,11 +171,19 @@ def main():
     check("a specialist's misspelled field is refused too", guard("kanban_complete", {"summary_x": "done"})[0])
     check("a specialist keeps its work tools", not guard("terminal", {"command": "ls"})[0] and not guard("kanban_complete", {"summary": "done"})[0])
     with open(os.path.join(HOME, "lead_guard.json"), "w") as handle:
+        json.dump({"specialist": "hw-schematic", "reviewer": "hw-review", "handoff": True}, handle)
+    blocked, reason = guard("kanban_complete", {"summary": "Drew the schematic.\nTools: kicad create_schematic"})
+    check("a handoff must name sources, tools and errors", blocked and "Missing: Sources, Errors and fixes" in reason, reason)
+    full = "Drew the schematic.\nSources: datasheet IRF3205\nTools: mcp__kicad__create_schematic\nErrors and fixes: none"
+    check("a complete handoff passes, for a review request too", not guard("kanban_complete", {"summary": full})[0]
+          and not guard("kanban_request_review", {"summary": full, "reviewer": "hw-review"})[0])
+    check("a block is not a handoff", not guard("kanban_block", {"reason": "which motor?", "kind": "needs_input"})[0])
+    with open(os.path.join(HOME, "lead_guard.json"), "w") as handle:
         handle.write(lead_config)
 
     # Hermes strips HERMES_KANBAN_TASK from a hook's environment: the task is found through the worker's pid.
     con = sqlite3.connect(DB)
-    con.execute("INSERT INTO task_runs VALUES (11, 't_lead01', ?, ?, NULL)", (now, os.getpid()))
+    con.execute("INSERT INTO task_runs (id, task_id, started_at, worker_pid) VALUES (11, 't_lead01', ?, ?)", (now, os.getpid()))
     con.commit(); con.close()
     blocked, reason = guard("terminal", {"command": "ls"}, task=None)
     check("without the variable the board task is found through the worker's pid", blocked and "switched off" in reason, reason)

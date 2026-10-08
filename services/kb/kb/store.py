@@ -75,10 +75,11 @@ def read_meta(path: str) -> dict:
 
 
 def _meta_tags(meta: dict) -> str:
-    """Front-matter tags plus `kind:<kind>`, so notes can be filtered by kind."""
+    """Front-matter tags plus `kind:<kind>` and `project:<name>`, so notes can be filtered by kind and project."""
     tags = meta.get("tags") or ""
     tags = " ".join(map(str, tags)) if isinstance(tags, list) else str(tags)
-    return " ".join(filter(None, [tags, f"kind:{meta['kind']}" if meta.get("kind") else ""]))
+    project = re.sub(r"[^a-z0-9]+", "-", str(meta.get("project") or "").lower()).strip("-")[:40]
+    return " ".join(filter(None, [tags, f"kind:{meta['kind']}" if meta.get("kind") else "", f"project:{project}" if project else ""]))
 
 
 def walk(base: str = KNOWLEDGE):

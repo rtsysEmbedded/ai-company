@@ -7,7 +7,9 @@ run commands, change files other than its notes, or use a department tool that p
 cannot finish a task without having given work to its team. Every refusal tells it whom to give the work to.
 
 Every other agent gets the same script as a small guard for its board calls only: a misspelled field name is
-refused with the right one, and a review request must name the reviewer.
+refused with the right one, a review request must name the reviewer, and a handoff must end with its sources,
+tools and errors. A lead searches the knowledge base before it hands out work and writes the job's knowledge
+before it closes its check-and-report task (both asked for once; a second call passes).
 
 Installed by `dept apply` / `apply_team.py`, which also write lead_guard.json (the team, or for a specialist
 its name and the reviewer) into the profile.
@@ -175,6 +177,109 @@ def review_reason(name, args, config):
             "the review comes back to you instead of going to %s." % (reviewer, reviewer))
 
 
+# --- knowledge: read before the work is handed out, written when the job is closed -------------------------------
+LESSONS = os.environ.get("LEAD_GUARD_KNOWLEDGE") or os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "knowledge", "lessons")
+HANDOFF = ("Sources", "Tools", "Errors and fixes")   # the three closing lines of a specialist's handoff
+
+
+def _marker(task_id, run_id, what):
+    return os.path.join(tempfile.gettempdir(), "lead-guard-%s-%s-%s" % (task_id, run_id or "0", what))
+
+
+def uses_kb(name, args, tool):
+    """True when this call (directly or through tool_call) runs the given knowledge-base tool."""
+    if name.endswith("__" + tool):
+        return True
+    calls = (args.get("calls") or []) if name == "tool_call" and isinstance(args, dict) else []
+    return any(isinstance(c, dict) and str(c.get("name") or "").endswith("__" + tool) for c in calls)
+
+
+def notes_since(run_id):
+    """How many knowledge notes were written since this run started; None when that cannot be told."""
+    con = _board()
+    if not con or not os.path.isdir(LESSONS):
+        return None
+    try:
+        row = con.execute("SELECT started_at FROM task_runs WHERE id = ?", (run_id,)).fetchone() if run_id else None
+    except sqlite3.Error:
+        return None
+    finally:
+        con.close()
+    if not row or not row[0]:
+        return None
+    try:
+        return sum(1 for f in os.listdir(LESSONS) if f.endswith(".md") and os.path.getmtime(os.path.join(LESSONS, f)) >= row[0] - 2)
+    except OSError:
+        return None
+
+
+def _said(text, label):
+    """What a handoff says under one of its closing lines ("" for nothing or "none")."""
+    found = re.search(r"^\W*%s\s*:(.*?)(?=^\W*(?:%s)\s*:|\Z)" % (re.escape(label), "|".join(map(re.escape, HANDOFF))),
+                      text or "", re.I | re.M | re.S)
+    said = (found.group(1) if found else "").strip()
+    return "" if re.fullmatch(r"(?i)\W*(none|no|n/a|nothing|-)?\W*", said) else said
+
+
+def owed_kinds(task_id, run_id):
+    """The note kinds this closing task still owes: always a lesson, research when a handoff names sources, error
+    when it names a solved problem, minus what was written in this run. Empty when it cannot be told."""
+    con = _board()
+    if not con:
+        return []
+    try:
+        row = con.execute("SELECT started_at FROM task_runs WHERE id = ?", (run_id,)).fetchone() if run_id else None
+        texts = [r[0] or "" for r in con.execute(
+            "SELECT (SELECT summary FROM task_runs WHERE task_id = l.parent_id AND summary IS NOT NULL ORDER BY id DESC LIMIT 1) "
+            "FROM task_links l WHERE l.child_id = ?", (task_id,))]
+    except sqlite3.Error:
+        return []
+    finally:
+        con.close()
+    if not row or not row[0]:
+        return []
+    owed = ["lesson"] + [kind for kind, label in (("research", "Sources"), ("error", "Errors and fixes")) if any(_said(t, label) for t in texts)]
+    written = set()
+    try:
+        for f in os.listdir(LESSONS):
+            path = os.path.join(LESSONS, f)
+            if f.endswith(".md") and os.path.getmtime(path) >= row[0] - 2:
+                with open(path, encoding="utf-8", errors="replace") as handle:
+                    kind = re.search(r"^kind:\s*(\w+)", handle.read(600), re.M)
+                written.add(kind.group(1) if kind else "lesson")
+    except OSError:
+        return []
+    return [kind for kind in owed if kind not in written]
+
+
+def check_task(profile, task_id):
+    """True for the lead's own closing task ("... check and report")."""
+    con = _board()
+    if not con:
+        return False
+    try:
+        row = con.execute("SELECT created_by, title FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        return bool(row and row[0] == profile and "check and report" in str(row[1] or "").lower())
+    except sqlite3.Error:
+        return False
+    finally:
+        con.close()
+
+
+def handoff_reason(name, args, config):
+    """A reason to refuse a specialist's handoff that leaves out what the company wants to keep, or None."""
+    if not config.get("handoff") or name not in ("kanban_complete", "kanban_request_review") or not isinstance(args, dict):
+        return None
+    text = "%s\n%s" % (args.get("summary") or "", args.get("result") or "")
+    missing = [label for label in HANDOFF if not re.search(r"^\W*%s\s*:" % re.escape(label), text, re.I | re.M)]
+    if not missing:
+        return None
+    return ("End your `summary` with these three lines, so that what you found out is kept for the next job (write \"none\" "
+            "where there is nothing): \"Sources: <links and files you used>\", \"Tools: <the tools and exact commands that "
+            "worked>\", \"Errors and fixes: <what went wrong and how you solved it>\". Missing: %s. Send the same call again "
+            "with them." % ", ".join(missing))
+
+
 def own_task(profile, task_id):
     """True for a task the lead may finish without handing out work: its own closing "check and report" task,
     a blocked specialist's question, or another lead's request (it may simply answer)."""
@@ -254,6 +359,11 @@ def check(name, args, config, profile, task_id, run_id):
     team = team_text(config)
     hand_over = ("You are the lead on a board task: you plan and hand out the work, you do not do it. Put this step into "
                  "a task for the specialist who does it (kanban_create, same workspace_path). %s" % team)
+    if uses_kb(name, args, "kb_search"):   # remembered: the lead looked into the company's knowledge in this run
+        try:
+            open(_marker(task_id, run_id, "kbsearch"), "w").close()
+        except OSError:
+            pass
     if name == "tool_call":
         for call in (args.get("calls") or []) if isinstance(args, dict) else []:
             if isinstance(call, dict):
@@ -275,8 +385,22 @@ def check(name, args, config, profile, task_id, run_id):
         return ("A missing tool or skill is not a reason for a lead to block: give the work to the specialist who has it. "
                 "%s If truly nobody in any team can do it, call kanban_block again and name exactly what is missing." % team)
     if name == "kanban_create":
-        return goal_reason(args, config) or duplicate_reason(args, task_id, run_id)
+        reason = goal_reason(args, config) or duplicate_reason(args, task_id, run_id)
+        if not reason and not os.path.exists(_marker(task_id, run_id, "kbsearch")) and first_time(task_id, run_id, "needsearch"):
+            reason = ("Before you hand out work, look into the company's knowledge once: call `kb_search` with the project name "
+                      "and the topic of the job. Put what helps (earlier errors and their fixes, procedures, research, decisions) "
+                      "into the task bodies, then create the tasks. If nothing is found, go on.")
+        return reason
     if name == "kanban_complete":
+        owed = owed_kinds(task_id, run_id) if check_task(profile, task_id) and created_tasks_in_run(task_id, run_id) == 0 else []
+        if owed and first_time(task_id, run_id, "need-" + "-".join(owed)):   # each missing set is asked for once
+            words = {"lesson": "one `lesson` for the job (What was the job / What worked / What went wrong / Next time)",
+                     "research": "one `research` note, because the handoffs name sources (Question / Findings / Sources / Open "
+                                 "points); copy the links themselves into Sources",
+                     "error": "one `error` note for each problem the handoffs say was solved (Symptom / Cause / Fix / How to check)"}
+            return ("The job is finished, so keep what was learned before you close it. Still to write with `kb_add` (set `project` "
+                    "and `task`; the facts are in the handoffs of the tasks you checked): %s. A `howto` for a tool procedure that "
+                    "worked is welcome too. Then call kanban_complete again." % "; ".join(words[k] for k in owed))
         count = created_tasks(profile, task_id, run_id) or len(job_tasks(task_id))   # work handed out in an earlier run counts
         if count == 0 and not own_task(profile, task_id) and first_time(task_id, run_id, "complete"):
             return ("You have not given any work to your team in this run. Create the tasks for your specialists with "
@@ -296,7 +420,8 @@ def main():
         if reason:
             block(reason)
         if config.get("specialist"):   # a specialist's guard checks only how it talks to the board
-            reason = review_reason(str(payload.get("tool_name") or ""), payload.get("tool_input"), config)
+            reason = (review_reason(str(payload.get("tool_name") or ""), payload.get("tool_input"), config)
+                      or handoff_reason(str(payload.get("tool_name") or ""), payload.get("tool_input"), config))
             if reason:
                 block(reason)
             allow()

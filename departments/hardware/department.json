@@ -20,7 +20,8 @@
       "tools": [
         "kanban",
         "kicad",
-        "freecad"
+        "freecad",
+        "kb"
       ],
       "needs": [
         "tools",
@@ -35,7 +36,9 @@
       "model": "google/gemini-3.8-flash",
       "fallback": "openai/gpt-oss-20b",
       "effort": "medium",
-      "tools": [],
+      "tools": [
+        "kb"
+      ],
       "needs": [
         "tools",
         "pdf"
@@ -49,7 +52,8 @@
       "fallback": "openai/gpt-oss-20b",
       "effort": "high",
       "tools": [
-        "kicad"
+        "kicad",
+        "kb"
       ],
       "needs": [
         "tools",
@@ -65,7 +69,8 @@
       "fallback": "openai/gpt-oss-20b",
       "effort": "high",
       "tools": [
-        "kicad"
+        "kicad",
+        "kb"
       ],
       "needs": [
         "tools",
@@ -81,7 +86,8 @@
       "effort": "high",
       "tools": [
         "freecad",
-        "kicad"
+        "kicad",
+        "kb"
       ],
       "needs": [
         "tools",
@@ -97,7 +103,8 @@
       "effort": "high",
       "tools": [
         "kicad",
-        "freecad"
+        "freecad",
+        "kb"
       ],
       "needs": [
         "tools",
@@ -113,7 +120,8 @@
       "fallback": "openai/gpt-oss-20b",
       "effort": "low",
       "tools": [
-        "kicad"
+        "kicad",
+        "kb"
       ],
       "needs": [
         "tools"

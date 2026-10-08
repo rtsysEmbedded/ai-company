@@ -320,11 +320,13 @@ def guard_hook(lead=True):
 
 
 def guard_config(config, role):
-    """The guard's settings for one role: the team for the lead, the reviewer to name for everyone else."""
+    """The guard's settings for one role: the team for the lead; for everyone else the reviewer to name and
+    whether its handoff must carry the knowledge lines (not the reviewer, whose handoff is a verdict)."""
     routing = config.get("routing") or {}
     if role == routing.get("lead"):
         return guard_team(config)
-    return {"specialist": role, "reviewer": routing.get("reviewer") if routing.get("review", "changes") != "off" else ""}
+    return {"specialist": role, "reviewer": routing.get("reviewer") if routing.get("review", "changes") != "off" else "",
+            "handoff": role != routing.get("reviewer")}
 
 
 def guard_team(config):
@@ -355,6 +357,32 @@ NO_REVIEW_LINE = ("- Do not write a review instruction into a body. Each special
                   "rules, when it produced or changed something.")
 BLOCK_LINE = ("If you cannot go on (missing information, a missing tool, a decision that is not yours), use `kanban_block` "
               "with `kind: needs_input` and one precise question or the exact thing that is missing.")
+
+
+# What the company keeps from every job, in the words every team reads.
+HANDOFF_RULE = ("End every handoff (the `summary` of `kanban_complete` or `kanban_request_review`) with three lines, so that "
+                "what you found out is kept: `Sources:` the links and files you used; `Tools:` the tools and the exact "
+                "commands or tool calls that worked; `Errors and fixes:` what went wrong and how you solved it. Write "
+                "`none` where there is nothing.")
+
+
+def knowledge_rules(lead):
+    """How a lead uses and fills the company's knowledge base: read before the work, written when the job is closed."""
+    return ["",
+            "# Company knowledge: read it first, write it last",
+            "Before you plan a job, call `kb_search` with the project name and the topic. Earlier errors and their fixes, "
+            "procedures, research and decisions are there. Put what helps into the task bodies (the note's path and the "
+            "point), so a specialist does not repeat a solved problem.",
+            "When your `check and report` task finds the job finished, write what was learned with `kb_add` before you "
+            "complete it. You are the one who writes; the facts are in the three closing lines of each handoff (Sources, "
+            "Tools, Errors and fixes). Set `project` and `task` on every note. One note is one thing:",
+            "- `lesson`, always one per job: What was the job / What worked / What went wrong / Next time.",
+            "- `error`, one for each problem that was solved: Symptom / Cause / Fix / How to check.",
+            "- `howto`, for a tool procedure that worked: Goal / Steps (the exact commands or tool calls) / Check.",
+            "- `research`, when something was looked up: Question / Findings / Sources (links, files) / Open points.",
+            "- `decision`, for a design decision taken in the job: Context / Decision / Why / Consequences.",
+            "Search before you write: if the same note exists, do not write it twice; if an old note is wrong, retire it "
+            "with `kb_retire` and write the new one. No secrets or keys in a note."]
 
 
 def closing_rules(lead):
@@ -601,9 +629,12 @@ def test_model(model_id, key):
 
 
 # --- the text each agent gets ---------------------------------------------------
+COMMON_TOOLS = ("kanban", "kb")   # every role may have these; they do not make a role the one for a job
+
+
 def tool_names(spec):
-    """A role's own tools in words, without the task board: 'kicad, freecad' or 'no special tools'."""
-    return ", ".join(t for t in spec.get("tools") or [] if t != "kanban") or "no special tools"
+    """A role's own tools in words, without the task board and the knowledge base: 'kicad, freecad' or 'no special tools'."""
+    return ", ".join(t for t in spec.get("tools") or [] if t not in COMMON_TOOLS) or "no special tools"
 
 
 def tools_rules(role, config):
@@ -620,7 +651,7 @@ def tools_rules(role, config):
             lines.append("- **%s** (%s): a skill, read it with `skill_view`." % (tool, label))
         else:
             lines.append("- **%s** (%s)." % (tool, label))
-    if len(lines) == 1:
+    if not [t for t in spec.get("tools") or [] if t not in COMMON_TOOLS]:
         lines.append("You have the general tools (files, terminal, web) and no special tools of this department.")
     first = next((t for t in spec.get("tools") or [] if (registry.get(t) or {}).get("kind") == "mcp"), None)
     lines.append("A tool that is not in your tool list yet is loaded on demand: find it with `tool_search`%s and run it "
@@ -669,6 +700,7 @@ def routing_rules(role, config):
         lines.append("After creating the tasks, tell the user the plan (task ids, who does what, in which order). Use "
                      "`kanban_list` and `kanban_show` to report progress when asked. Answer simple questions yourself, without the board.")
         lines += closing_rules(lead)
+        lines += knowledge_rules(lead)
         lines += ["",
                   "# When a task on the board is assigned to you",
                   "A board task for you is the same request as in a chat: plan and delegate. Do not do the specialist work "
@@ -700,6 +732,8 @@ def routing_rules(role, config):
                  "stops counts as a crash and is repeated from the start.")
     lines.append("You do not write to other teams. If you need something from another team, block and say what you need; "
                  "your lead sends the request.")
+    if role != reviewer:
+        lines.append(HANDOFF_RULE)
     return "\n".join(lines)
 
 

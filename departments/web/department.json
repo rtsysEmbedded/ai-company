@@ -36,7 +36,8 @@
       "fallback": "deepseek/deepseek-v4-pro-0813",
       "effort": "high",
       "tools": [
-        "modern-web-guidance"
+        "modern-web-guidance",
+        "kb"
       ],
       "needs": [
         "tools",
@@ -81,7 +82,8 @@
       "fallback": "deepseek/deepseek-v4-pro-0813",
       "effort": "medium",
       "tools": [
-        "modern-web-guidance"
+        "modern-web-guidance",
+        "kb"
       ],
       "needs": [
         "tools",
@@ -96,7 +98,8 @@
       "fallback": "deepseek/deepseek-v4-pro-0813",
       "effort": "high",
       "tools": [
-        "modern-web-guidance"
+        "modern-web-guidance",
+        "kb"
       ],
       "needs": [
         "tools",
