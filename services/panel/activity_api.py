@@ -7,13 +7,14 @@ Costs are Hermes' estimates unless the provider reported an actual cost.
 """
 import json
 import os
+import re
 import sqlite3
 import subprocess
 import sys
 import time
 
 import yaml
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 import causes
 import paperclip_usage
@@ -35,15 +36,20 @@ def hermes_home() -> str:
 
 
 def _connect(db: str):
-    """Open one of Hermes' SQLite files without ever creating or deleting its -wal/-shm side files.
+    """Open one of Hermes' SQLite files without ever creating, deleting or resetting its -wal/-shm side files.
 
-    A normal connection that is the last one to close checkpoints and DELETES the -wal file. Hermes
-    watches that file and aborts the running agent's turn when it disappears ("retired state.db-wal
-    generation"). So: read-only when a -wal exists (a read-only connection cannot remove it), and
+    Two ways a reader can kill a running agent:
+    - A normal connection that is the last one to close checkpoints and DELETES the -wal file. Hermes watches
+      that file and aborts the agent's turn when it disappears ("retired state.db-wal generation").
+    - Even a mode=ro connection opens the -shm index read-write. Hermes drops its own lock on that file (it
+      opens and closes it to fix permissions), so SQLite here thinks nobody uses the database and truncates
+      the index; the agent's next read of its mapping dies with "Bus error: 10".
+    So: read-only with a read-only -shm while a WAL exists (it can neither remove nor reset anything), and
     immutable when there is none (everything is in the main file; nothing gets created).
     """
     from urllib.parse import quote
-    mode = "mode=ro" if os.path.exists(db + "-wal") else "immutable=1"
+    live = os.path.exists(db + "-wal") and os.path.exists(db + "-shm")
+    mode = "mode=ro&readonly_shm=1" if live else "immutable=1"
     return sqlite3.connect(f"file:{quote(db)}?{mode}", uri=True, timeout=3)
 
 
@@ -351,8 +357,150 @@ def snapshot(range_key: str = "today", department: str = "") -> dict:
     }
 
 
+MAX_TEXT = 20000        # one message shown in the panel
+MAX_TOOL_RESULT = 4000  # one tool result shown in the panel
+QUIET_EVENTS = {"heartbeat", "claimed", "spawned", "commented"}   # noise, or shown another way
+
+
+def _clip(text, limit: int) -> str:
+    text = text or ""
+    return text if len(text) <= limit else text[:limit] + "\n… (%d more characters)" % (len(text) - limit)
+
+
+MESSAGE_COLS = "id, session_id, role, content, tool_calls, tool_name, reasoning, timestamp"
+FEED_START, FEED_STEP = 80, 300   # messages in the first reply of an agent's live feed, and at most per later reply
+
+
+def _message(m: dict) -> dict:
+    calls = []
+    try:
+        for c in json.loads(m["tool_calls"] or "[]"):
+            fn = c.get("function") or {}
+            calls.append({"name": fn.get("name") or "?", "arguments": _clip(fn.get("arguments"), MAX_TOOL_RESULT)})
+    except (ValueError, AttributeError):
+        pass
+    return {"role": m["role"], "at": m["timestamp"], "tool": m["tool_name"], "calls": calls,
+            "text": _clip(m["content"], MAX_TOOL_RESULT if m["role"] == "tool" else MAX_TEXT),
+            "thinking": _clip(m["reasoning"], MAX_TOOL_RESULT)}
+
+
+def _session_messages(profile: str, session_id: str) -> list:
+    return [_message(m) for m in _rows(_state_db(profile), f"SELECT {MESSAGE_COLS} FROM messages WHERE session_id = ? ORDER BY id", (session_id,))]
+
+
+def agent_feed(profile: str, after: int = 0):
+    """What one agent says and does, across all its sessions, in the order it happens.
+
+    The first call (after=0) returns its latest messages; each later call passes the last id it has and gets
+    only what was written since. Every message names its session, and the session names its board task if any.
+    """
+    if profile not in _installed_profiles():
+        return None
+    db, now = _state_db(profile), time.time()
+    if after > 0:
+        rows = _rows(db, f"SELECT {MESSAGE_COLS} FROM messages WHERE id > ? ORDER BY id LIMIT ?", (after, FEED_STEP))
+    else:
+        rows = _rows(db, f"SELECT {MESSAGE_COLS} FROM messages ORDER BY id DESC LIMIT ?", (FEED_START,))[::-1]
+    open_now, busy = _live(profile, now)
+    sessions = {}
+    if rows:
+        ids = sorted({m["session_id"] for m in rows})
+        marks = ",".join("?" * len(ids))
+        found = {r["id"]: r for r in _rows(db, f"SELECT id, source, title, cwd, model, started_at, ended_at FROM sessions WHERE id IN ({marks})", ids)}
+        # Which board task a session belongs to: the same pairing of runs and sessions as everywhere else.
+        task_of, used, all_sessions = {}, set(), _sessions(profile, 0)
+        titles = {t["id"]: t["title"] for t in _rows(os.path.join(hermes_home(), "kanban.db"), "SELECT id, title FROM tasks")}
+        for r in _rows(os.path.join(hermes_home(), "kanban.db"),
+                       "SELECT id, task_id, profile, started_at, ended_at FROM task_runs WHERE profile = ? ORDER BY started_at", (profile,)):
+            match = _match(r, all_sessions, used)
+            if match:
+                task_of[match["id"]] = r["task_id"]
+        for sid in ids:
+            x = found.get(sid) or {}
+            task = task_of.get(sid)
+            sessions[sid] = {"id": sid, "title": titles.get(task) or x.get("title") or "", "task_id": task, "source": x.get("source") or "",
+                             "cwd": x.get("cwd") or "", "model": x.get("model") or "", "started_at": x.get("started_at"),
+                             "state": "working" if sid in busy else "open" if sid in open_now and not x.get("ended_at") else "ended"}
+    return {"profile": profile, "messages": [dict(_message(m), id=m["id"], session_id=m["session_id"]) for m in rows],
+            "sessions": sessions, "last": rows[-1]["id"] if rows else after, "working": bool(busy), "now": now}
+
+
+def conversation(task_id: str):
+    """Everything said and done on one task, oldest first: comments, board events, and every run's messages."""
+    kdb = os.path.join(hermes_home(), "kanban.db")
+    task = _rows(kdb, "SELECT id, title, body, assignee, status FROM tasks WHERE id = ?", (task_id,))
+    if not task:
+        return None
+    # Pair runs with sessions the same way the activity snapshot does: over the whole board, in start order.
+    sessions, used, items = {}, set(), []
+    for r in _rows(kdb, "SELECT id, task_id, profile, status, outcome, started_at, ended_at, summary, error FROM task_runs ORDER BY started_at"):
+        if r["profile"] not in sessions:
+            sessions[r["profile"]] = _sessions(r["profile"], 0)
+        s = _match(r, sessions[r["profile"]], used)
+        if r["task_id"] != task_id:
+            continue
+        items.append({"kind": "run", "at": r["started_at"], "run_id": r["id"], "profile": r["profile"], "status": r["status"],
+                      "outcome": r["outcome"], "ended_at": r["ended_at"], "summary": r["summary"], "error": r["error"],
+                      "model": (s or {}).get("model"), "session_id": (s or {}).get("id"),
+                      "messages": _session_messages(r["profile"], s["id"]) if s else []})
+    for c in _rows(kdb, "SELECT author, body, created_at FROM task_comments WHERE task_id = ? ORDER BY id", (task_id,)):
+        items.append({"kind": "comment", "at": c["created_at"], "author": c["author"], "text": c["body"]})
+    for e in _rows(kdb, "SELECT kind, payload, run_id, created_at FROM task_events WHERE task_id = ? ORDER BY id", (task_id,)):
+        if e["kind"] in QUIET_EVENTS:
+            continue
+        try:
+            payload = json.loads(e["payload"] or "{}") or {}
+        except ValueError:
+            payload = {}
+        note = payload.get("reason") or payload.get("error") or payload.get("summary") or ""
+        items.append({"kind": "event", "at": e["created_at"], "event": e["kind"], "run_id": e["run_id"], "text": _clip(str(note), 600)})
+    order = {"run": 0, "event": 1, "comment": 2}
+    items.sort(key=lambda i: (i["at"] or 0, order[i["kind"]]))
+    return {"task": task[0], "items": items, "now": time.time()}
+
+
+def session_conversation(profile: str, session_id: str):
+    """One direct session (hermes in a folder, panel chat, Paperclip) in the same shape as a task's conversation."""
+    if profile not in _installed_profiles():
+        return None
+    rows = _rows(_state_db(profile), "SELECT id, title, model, cwd, started_at, ended_at FROM sessions WHERE id = ?", (session_id,))
+    if not rows:
+        return None
+    s, now = rows[0], time.time()
+    open_now, busy = _live(profile, now)
+    state = "ended" if s["ended_at"] else "working" if s["id"] in busy else "open" if s["id"] in open_now else "ended"
+    info = profiles().get(profile) or {}
+    run = {"kind": "run", "at": s["started_at"], "profile": info.get("role", profile), "model": s["model"], "session_id": s["id"],
+           "status": "running" if state == "working" else "done", "outcome": "", "ended_at": s["ended_at"], "summary": None, "error": None,
+           "messages": _session_messages(profile, s["id"])}
+    return {"session": {"id": s["id"], "profile": profile, "role": info.get("role", profile), "title": s["title"] or "",
+                        "cwd": s["cwd"] or "", "state": state}, "items": [run], "now": now}
+
+
 def build_router(auth) -> APIRouter:
     router = APIRouter(dependencies=[Depends(auth)])
+
+    @router.get("/api/sessions/{profile}/{session_id}/conversation")
+    def direct_conversation(profile: str, session_id: str):
+        ok = re.fullmatch(r"[\w-]{1,64}", profile) and re.fullmatch(r"[\w-]{3,64}", session_id)
+        data = session_conversation(profile, session_id) if ok else None
+        if not data:
+            raise HTTPException(404, "unknown session")
+        return data
+
+    @router.get("/api/agents/{profile}/feed")
+    def feed(profile: str, after: int = 0):
+        data = agent_feed(profile, max(0, after)) if re.fullmatch(r"[\w-]{1,64}", profile) else None
+        if data is None:
+            raise HTTPException(404, "unknown agent")
+        return data
+
+    @router.get("/api/tasks/{task_id}/conversation")
+    def task_conversation(task_id: str):
+        data = conversation(task_id) if re.fullmatch(r"t_[0-9a-f]{4,32}", task_id) else None
+        if not data:
+            raise HTTPException(404, "unknown task")
+        return data
 
     @router.get("/api/activity")
     def activity(range: str = "today", department: str = ""):

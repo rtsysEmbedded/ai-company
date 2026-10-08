@@ -29,7 +29,7 @@ ENV = os.path.join(SOFTWARE_ROOT, ".env")
 POLICIES = os.path.join(SOFTWARE_ROOT, "policies")
 EFFORTS = ("low", "medium", "high")
 ROLE_FIELDS = ("title", "enabled", "model", "fallback", "effort", "description", "needs")
-LEAD = "manager"
+MANAGER = "manager"   # the company's dispatcher (plain `hermes`); the team's own lead is routing.lead
 MAX_RULES = 20000
 REVIEW_TO_FILE = {"changes": "code", "all": "all", "off": "off"}   # the engine's word -> team.yaml's word
 REVIEW_FROM_FILE = {v: k for k, v in REVIEW_TO_FILE.items()}
@@ -49,7 +49,7 @@ ROUTING_EXTRA = [
      "help": "how often the dispatcher looks for ready tasks"},
     {"key": "planner_model", "label": "Planner model", "type": "model", "help": "cheap model that splits work into tasks"},
 ]
-CAPABILITIES = {"tools": "fixed", "projects_dir": False, "review_scope": False, "lead": False, "shared_key": False, "history": True}
+CAPABILITIES = {"tools": "fixed", "projects_dir": False, "review_scope": False, "shared_key": False, "history": True}
 
 
 def _team() -> dict:
@@ -68,6 +68,12 @@ def _edit_team(change):
     with open(tmp, "w", encoding="utf-8") as handle:
         ry.dump(doc, handle)
     os.replace(tmp, TEAM)
+
+
+def _lead(team: dict) -> str:
+    """The role that hands out the software team's tasks: routing.lead, or the manager when none is named."""
+    lead = (team.get("routing") or {}).get("lead")
+    return lead if lead in (team.get("roles") or {}) else MANAGER
 
 
 def _profile(role: str, spec: dict) -> str:
@@ -121,7 +127,7 @@ def state() -> dict:
         roles[role] = {"title": spec.get("title") or role, "enabled": enabled, "model": spec.get("model") or "",
                        "fallback": spec.get("fallback") or "", "effort": spec.get("effort", "medium"),
                        "description": spec.get("description") or "",
-                       "tools": (["kanban"] if role == LEAD else []) + ["kb"],   # what apply_team.py gives every role
+                       "tools": (["kanban"] if role in (MANAGER, _lead(team)) else []) + ["kb"],   # what apply_team.py gives every role
                        "needs": ["tools"] + needs, "profile": _profile(role, spec),
                        "key_env": spec.get("key_env") or "", "routable": spec.get("routable", True) is not False}
         actual = _actual(_profile(role, spec))
@@ -141,7 +147,7 @@ def state() -> dict:
         if enabled and not has_key:
             warnings.append("role %s: no API key yet, so Apply skips it" % role)
     routing["review"] = REVIEW_FROM_FILE.get(routing.get("review", "code"), "changes")
-    routing["lead"] = LEAD if LEAD in roles else None
+    routing["lead"] = _lead(team) if _lead(team) in roles else None
     pending = _pending()
     active = [s for s in status.values() if s["enabled"]]
     return {
@@ -152,10 +158,11 @@ def state() -> dict:
                    "key": {"shared": False, "department": False, "sources": []}},
         "errors": [], "warnings": warnings, "presets": {}, "choices": {"efforts": EFFORTS, "review": list(REVIEW_TO_FILE)},
         "capabilities": CAPABILITIES, "routing_extra": ROUTING_EXTRA, "file": "team.yaml", "rules_prefix": "",
+        "mode": team.get("mode") if team.get("mode") in ("manager", "general") else "manager",
     }
 
 
-def _role_errors(role: str, spec: dict, new: dict, known: dict) -> list:
+def _role_errors(role: str, spec: dict, new: dict, known: dict, lead: str = MANAGER) -> list:
     errors = []
     model, fallback = str(new.get("model", "")).strip(), str(new.get("fallback", "")).strip()
     if not model:
@@ -169,8 +176,10 @@ def _role_errors(role: str, spec: dict, new: dict, known: dict) -> list:
         errors.append("role %s: effort must be one of %s" % (role, ", ".join(EFFORTS)))
     if not " ".join(str(new.get("description", "")).split()):
         errors.append("role %s: a description is required" % role)
-    if not new.get("enabled", True) and role == LEAD:
+    if not new.get("enabled", True) and role == MANAGER:
         errors.append("role %s: the manager cannot be disabled, it hands out the work" % role)
+    elif not new.get("enabled", True) and role == lead:
+        errors.append("role %s: the lead cannot be disabled - choose another lead under Routing first" % role)
     return errors
 
 
@@ -182,7 +191,7 @@ def _routing_changes(submitted: dict, team: dict, known: dict):
             errors.append("review must be one of %s" % ", ".join(REVIEW_TO_FILE))
         else:
             changes["review"] = REVIEW_TO_FILE[submitted["review"]]
-    fields = [{"key": "reviewer", "type": "role"}, {"key": "task_timeout", "type": "duration"}] + ROUTING_EXTRA
+    fields = [{"key": "lead", "type": "role"}, {"key": "reviewer", "type": "role"}, {"key": "task_timeout", "type": "duration"}] + ROUTING_EXTRA
     for field in fields:
         key = field["key"]
         if key not in submitted:
@@ -224,7 +233,7 @@ def save(submitted: dict) -> dict:
                   "description": spec.get("description") or "", "enabled": spec.get("enabled", True) is not False,
                   "title": spec.get("title") or role, "needs": spec.get("needs") or []}
         merged.update({f: new[f] for f in ROLE_FIELDS if f in new})
-        errors += _role_errors(role, spec, merged, known)
+        errors += _role_errors(role, spec, merged, known, (submitted.get("routing") or {}).get("lead") or _lead(team))
         role_changes[role] = merged
     routing, routing_errors = _routing_changes(submitted.get("routing") or {}, team, known)
     errors += routing_errors
@@ -261,6 +270,28 @@ def save(submitted: dict) -> dict:
             doc["routing"][key] = value
     _edit_team(change)
     return state()
+
+
+MODES = ("manager", "general")
+
+
+def mode() -> str:
+    """How the main agent (plain `hermes`) works: 'manager' hands work to the team, 'general' does it itself."""
+    value = _team().get("mode")
+    return value if value in MODES else "manager"
+
+
+def set_mode(value: str):
+    if value not in MODES:
+        raise HTTPException(400, "mode must be manager or general")
+
+    def change(doc):
+        if value == "manager":
+            if "mode" in doc:
+                del doc["mode"]      # manager is the default; keep the file tidy
+        else:
+            doc["mode"] = value
+    _edit_team(change)
 
 
 def _key_name(role: str) -> str:
@@ -300,10 +331,10 @@ def delete_role(role: str) -> dict:
     spec = team["roles"].get(role)
     if spec is None:
         raise HTTPException(404, "unknown role")
-    if role == LEAD:
+    if role == MANAGER:
         raise HTTPException(400, "The manager cannot be deleted, it hands out the work")
     routing = team.get("routing") or {}
-    used = [key for key in ("reviewer", "security_profile", "escalate_to", "default_assignee") if routing.get(key) == role]
+    used = [key for key in ("lead", "reviewer", "security_profile", "escalate_to", "default_assignee") if routing.get(key) == role]
     if used:
         raise HTTPException(400, "%s is still used in Routing (%s) - choose another role there first" % (role, ", ".join(used)))
 
@@ -367,7 +398,11 @@ class ApplyIn(BaseModel):
     message: str = ""
 
 
-def build_router(auth, apply_fn=None, check_key=key_usage.key_info) -> APIRouter:
+class ModeIn(BaseModel):
+    mode: str
+
+
+def build_router(auth, apply_fn=None, check_key=key_usage.key_info, mode_fn=None) -> APIRouter:
     """Register before dept_api's router: these paths would otherwise be read as a department named 'software'.
 
     `apply_fn(message)` commits and applies the team and returns (ok, log); the panel server supplies it.
@@ -378,6 +413,24 @@ def build_router(auth, apply_fn=None, check_key=key_usage.key_info) -> APIRouter
     @router.get(base)
     def get_software():
         return state()
+
+    @router.get("/api/mode")
+    def get_mode():
+        return {"mode": mode()}
+
+    @router.post("/api/mode")
+    def post_mode(body: ModeIn):
+        """Switch the main agent between manager and general mode. `mode_fn(mode)` rewrites its instructions
+        and returns (ok, note); models, keys and the other agents are not touched."""
+        before = mode()
+        if body.mode == before:
+            return {"mode": before, "changed": False, "note": ""}
+        set_mode(body.mode)
+        ok, note = mode_fn(body.mode) if mode_fn else (True, "")
+        if not ok:
+            set_mode(before)
+            raise HTTPException(500, "Could not switch: " + note)
+        return {"mode": body.mode, "changed": True, "note": note}
 
     @router.put(base + "/config")
     def put_software(body: ConfigIn):

@@ -79,14 +79,15 @@ def main():
     d = c.get(URL).json()
     check("has the shape of a department", d["department"] == "software" and set(d) >= {"config", "status", "errors", "warnings", "presets", "choices"})
     check("lists every role of team.yaml", list(d["config"]["roles"]) == list(before["roles"]))
-    check("the manager is the lead", d["config"]["routing"]["lead"] == "manager")
+    check("the lead is the one named in team.yaml, not the manager", d["config"]["routing"]["lead"] == "sw-lead" == before["routing"]["lead"])
     check("a role in sync with its profile has no differences", d["status"]["roles"]["backend"] == {
         "enabled": True, "exists": True, "has_key": True, "key_source": "role", "differences": []}, str(d["status"]["roles"]["backend"]))
     check("a role without a key is reported, not compared", d["status"]["roles"]["manager"]["has_key"] is False
           and d["status"]["roles"]["manager"]["differences"] == [] and any("manager" in w for w in d["warnings"]))
     check("the reply contains no key", "sk-or-v1" not in c.get(URL).text)
-    check("the tools are fixed: the task board for the manager, the knowledge base for all",
-          d["capabilities"]["tools"] == "fixed" and d["config"]["roles"]["manager"]["tools"] == ["kanban", "kb"] and d["config"]["roles"]["backend"]["tools"] == ["kb"])
+    check("the tools are fixed: the task board for the manager and the lead, the knowledge base for all",
+          d["capabilities"]["tools"] == "fixed" and d["config"]["roles"]["manager"]["tools"] == ["kanban", "kb"]
+          and d["config"]["roles"]["sw-lead"]["tools"] == ["kanban", "kb"] and d["config"]["roles"]["backend"]["tools"] == ["kb"])
     check("review is given in the engine's words", d["config"]["routing"]["review"] == "changes" and before["routing"]["review"] == "code")
 
     write(os.path.join(SW, ".env"), "%s=k\n%s=k\n" % (backend["key_env"], before["roles"]["manager"]["key_env"]))
@@ -124,6 +125,9 @@ def main():
     config = c.get(URL).json()["config"]
     config["roles"]["manager"]["enabled"] = False
     check("refuses to disable the manager", c.put(URL + "/config", json={"config": config}).status_code == 400)
+    config = c.get(URL).json()["config"]
+    config["roles"]["sw-lead"]["enabled"] = False
+    check("refuses to disable the lead", c.put(URL + "/config", json={"config": config}).status_code == 400)
     check("test of an unknown role is refused", c.post(URL + "/test", json={"role": "nope"}).status_code == 400)
 
     # ---- routing ----
@@ -133,7 +137,12 @@ def main():
     routing = team()["routing"]
     check("saves routing, numbers as numbers", r.status_code == 200 and routing["review"] == "all" and routing["reviewer"] == "security"
           and routing["task_timeout"] == "30m" and routing["escalate_after"] == 3 and routing["max_parallel"] == 2, r.text[:200])
-    check("the lead stays the manager", r.json()["config"]["routing"]["lead"] == "manager" and "lead" not in routing)
+    check("the lead can be changed", r.json()["config"]["routing"]["lead"] == "backend" == routing["lead"])
+    config["routing"]["lead"] = "nobody"
+    check("refuses an unknown lead", c.put(URL + "/config", json={"config": config}).status_code == 400)
+    config["routing"]["lead"] = "sw-lead"
+    check("refuses to delete the lead", c.put(URL + "/config", json={"config": config}).status_code == 200
+          and c.delete(URL + "/roles/sw-lead").status_code == 400)
     config["routing"]["review"] = "changes"
     c.put(URL + "/config", json={"config": config})
     check("'changes' is stored as 'code'", team()["routing"]["review"] == "code")

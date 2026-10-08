@@ -6,6 +6,7 @@
 - Chat runs `hermes -p <profile> chat -q ... -Q` and continues the same session with --resume.
   The agent works directly, with its own tools; the manager and the task board are not involved.
 - A task is one kanban card assigned to exactly that agent.
+- Retry puts a blocked task back in the queue (`hermes kanban unblock`); the dispatcher starts it again.
 """
 import json
 import os
@@ -21,6 +22,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 import activity_api
+import budget_api
+import causes
+import projects_api
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 TEAM = os.path.join(ROOT, "team.yaml")
@@ -38,6 +42,57 @@ def _agent(profile: str) -> dict:
     if not info:
         raise HTTPException(404, f"unknown agent: {profile}")
     return info
+
+
+# A task for a lead is a request to plan and hand out the work, not to do it alone.
+LEAD_TASK = ("\n\nThis task comes from the user, for you as the lead. Do not do the specialist work yourself. Plan it, "
+             "write your decisions into the project folder, then create one task per specialist with kanban_create "
+             "(same workspace folder, parents in the order of work), as your rules describe. The last task you create is "
+             "one for yourself, titled '... check and report', with all the other tasks as parents. Then finish with "
+             "kanban_complete and the plan: the task ids, who does what, in which order. If something that changes the "
+             "plan is unclear, use kanban_block with one precise question; the user answers it on the task. If this task starts "
+             "with a GOAL line, copy that line to the top of every task you create, so each specialist knows why the work exists.")
+
+
+def goal_block(goal: dict) -> str:
+    """Why the work exists: the project's goal, put at the top of the task so that it travels with it."""
+    return "GOAL (project %s): %s\n\n" % (goal["name"], goal["goal"])
+
+
+def _is_lead(info: dict) -> bool:
+    if info["dept"] == "software":
+        return info["role"] in ("manager", (_team().get("routing") or {}).get("lead"))
+    try:
+        return (activity_api.engine.load_config(info["dept"]).get("routing") or {}).get("lead") == info["role"]
+    except Exception:
+        return False
+
+
+def _blocked_task(task_id: str) -> dict:
+    """The task, if it exists, is blocked and its agent can run; otherwise the matching HTTP error."""
+    if not re.fullmatch(r"t_[0-9a-f]{4,32}", task_id):
+        raise HTTPException(400, "invalid task id")
+    rows = activity_api._rows(os.path.join(activity_api.hermes_home(), "kanban.db"),
+                              "SELECT status, assignee FROM tasks WHERE id = ?", (task_id,))
+    if not rows:
+        raise HTTPException(404, "unknown task")
+    if rows[0]["status"] != "blocked":
+        raise HTTPException(400, "Only a blocked task can be continued; this one is %s" % rows[0]["status"])
+    assignee = rows[0]["assignee"]
+    if assignee and assignee in activity_api.profiles() and not is_enabled(assignee):
+        raise HTTPException(400, "%s is disabled. Enable the agent first." % assignee)
+    if assignee and assignee in activity_api.profiles():
+        try:
+            budget_api.check(assignee)
+        except HTTPException as exc:
+            raise HTTPException(400, exc.detail)
+    return rows[0]
+
+
+def _kanban(*args: str):
+    r = subprocess.run(["hermes", "kanban", *args], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    if r.returncode != 0:
+        raise HTTPException(500, (r.stderr or r.stdout or "hermes kanban %s failed" % args[0])[-300:])
 
 
 def _team() -> dict:
@@ -58,6 +113,7 @@ def is_enabled(profile: str) -> bool:
 def _require_ready(profile: str):
     if not is_enabled(profile):
         raise HTTPException(409, f"{profile} is disabled. Enable it first.")
+    budget_api.check(profile)
     home = activity_api.hermes_home()
     if profile != "default" and not os.path.isdir(os.path.join(home, "profiles", profile)):
         raise HTTPException(409, f"{profile} has no Hermes profile yet. Apply its department first.")
@@ -93,7 +149,7 @@ def set_enabled(profile: str, enabled: bool) -> dict:
         if not enabled:
             if role == "manager":
                 raise HTTPException(400, "The manager cannot be disabled: it runs the task board.")
-            used = [k for k in ("reviewer", "security_profile", "escalate_to", "default_assignee") if routing.get(k) == role]
+            used = [k for k in ("lead", "reviewer", "security_profile", "escalate_to", "default_assignee") if routing.get(k) == role]
             if used:
                 raise HTTPException(400, f"{role} is used by the routing rules ({', '.join(used)}). Change them under Software > Routing first.")
         from ruamel.yaml import YAML
@@ -106,10 +162,10 @@ def set_enabled(profile: str, enabled: bool) -> dict:
             spec["enabled"] = False
         with open(TEAM, "w") as f:
             ry.dump(doc, f)
-        # Only the manager's team list changes; models and keys are not touched.
+        # Only the team lists of the manager and the lead change; models and keys are not touched.
         r = subprocess.run([UV, "run", "--project", ROOT, "-q", "python", os.path.join(ROOT, "scripts", "apply_team.py"),
-                            "--only", "manager", "--soul-only"], capture_output=True, text=True, cwd=ROOT)
-        note = "The manager's team list was updated." if r.returncode == 0 else f"Saved, but updating the manager failed: {(r.stderr or r.stdout)[-200:]}"
+                            "--only", "manager", str(routing.get("lead") or "manager"), "--soul-only"], capture_output=True, text=True, cwd=ROOT)
+        note = "The team list was updated." if r.returncode == 0 else f"Saved, but updating the team list failed: {(r.stderr or r.stdout)[-200:]}"
     else:
         engine = activity_api.engine
         cfg = engine.load_config(dept)
@@ -243,6 +299,10 @@ class TaskIn(BaseModel):
     timeout_minutes: int = 45
 
 
+class AnswerIn(BaseModel):
+    text: str
+
+
 def build_router(auth) -> APIRouter:
     router = APIRouter(dependencies=[Depends(auth)])
 
@@ -261,6 +321,9 @@ def build_router(auth) -> APIRouter:
         if body.session_id and not re.fullmatch(r"[\w-]{6,64}", body.session_id):
             raise HTTPException(400, "invalid session id")
         folder = _folder(body.folder)
+        if body.session_id and body.session_id in activity_api._live(profile, time.time())[0]:
+            # Another Hermes has this session open and keeps its own copy of the conversation; a second writer would split it.
+            raise HTTPException(409, "This session is open in a terminal. Answer it there, or close it and then continue here.")
         with _lock:
             if profile in _busy:
                 raise HTTPException(409, f"{profile} is still answering your previous message.")
@@ -313,14 +376,21 @@ def build_router(auth) -> APIRouter:
             raise HTTPException(400, "give the task a title")
         folder = _folder(body.folder)
         text = body.body.strip()[:MAX_MESSAGE]
+        goal = projects_api.goal_for(folder)
+        if goal.get("goal"):
+            text = goal_block(goal) + text
         routing = _team().get("routing") or {}
         reviewer = routing.get("reviewer", "reviewer")
-        if body.review and info["dept"] == "software" and profile != reviewer:
+        if _is_lead(info):
+            text += LEAD_TASK
+        elif body.review and info["dept"] == "software" and profile != reviewer:
             text += f"\n\nWhen done, call kanban_request_review with reviewer={reviewer}."
         else:
             text += "\n\nThis is a direct task from the user: when done, finish it with kanban_complete and a short summary. No review is needed."
         cmd = ["hermes", "kanban", "create", title, "--assignee", profile, "--body", text.strip(), "--created-by", "panel",
                "--max-runtime", f"{max(5, min(body.timeout_minutes, 240))}m"]
+        if not _is_lead(info):   # Hermes' goal loop: a specialist that stops early is told to go on and to close the task
+            cmd += ["--goal", "--goal-max-turns", str(getattr(activity_api.engine, "GOAL_TURNS", 6))]
         if folder:
             cmd += ["--workspace", f"dir:{folder}"]
         r = subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL)
@@ -328,5 +398,38 @@ def build_router(auth) -> APIRouter:
         if r.returncode != 0 or not m:
             raise HTTPException(500, (r.stderr or r.stdout or "could not create the task")[-300:])
         return {"task_id": m.group(1), "assignee": profile}
+
+    @router.post("/api/tasks/{task_id}/retry")
+    def retry(task_id: str):
+        assignee = _blocked_task(task_id)["assignee"]
+        _kanban("unblock", task_id, "--reason", "retry from the panel")
+        # The last run's real cause: if the provider refused the call, the retry fails the same way until that is fixed.
+        cause = causes.run_causes(task_id).get("_last")
+        return {"task_id": task_id, "assignee": assignee, "warning": causes.LABELS.get(cause)}
+
+    @router.post("/api/tasks/{task_id}/archive")
+    def archive(task_id: str):
+        """Take a task off the board (Hermes keeps it in its archive). Not while an agent is working on it."""
+        if not re.fullmatch(r"t_[0-9a-f]{4,32}", task_id):
+            raise HTTPException(400, "invalid task id")
+        rows = activity_api._rows(os.path.join(activity_api.hermes_home(), "kanban.db"),
+                                  "SELECT status FROM tasks WHERE id = ?", (task_id,))
+        if not rows:
+            raise HTTPException(404, "unknown task")
+        if rows[0]["status"] == "running":
+            raise HTTPException(400, "An agent is working on this task right now. Wait until it stops.")
+        _kanban("archive", task_id)
+        return {"task_id": task_id, "archived": True}
+
+    @router.post("/api/tasks/{task_id}/answer")
+    def answer(task_id: str, body: AnswerIn):
+        """The user's reply to a blocked task: stored as a comment, which the agent reads on its next run."""
+        text = body.text.strip()[:MAX_MESSAGE]
+        if not text:
+            raise HTTPException(400, "write an answer first")
+        assignee = _blocked_task(task_id)["assignee"]
+        _kanban("comment", task_id, "--author", "user", "--", text)
+        _kanban("unblock", task_id)
+        return {"task_id": task_id, "assignee": assignee}
 
     return router

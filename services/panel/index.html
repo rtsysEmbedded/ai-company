@@ -134,8 +134,22 @@
   .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
   .banner { border: 1px solid var(--c); border-left-width: 5px; background: var(--surface); border-radius: var(--radius); padding: 10px 14px; margin-bottom: var(--gap); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .banner.bad { --c: var(--bad); } .banner.warn { --c: var(--warn); }
+  #modeBox { margin-top: auto; padding: 12px 8px; border-top: 1px solid var(--line); }
+  #modeBox .seg { display: flex; } #modeBox .seg button { flex: 1; }
+  #modeBox .help { margin-top: 6px; }
+  #envBox { margin-top: 0; }
+  .pcard .folder { font-family: var(--mono); font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+  .pcard.working { border-color: var(--good); }
   /* ---- flow ---- */
   .flow-now { display: grid; gap: 6px; }
+  #side a.item.sub { padding: 4px 8px 4px 22px; font-size: 13px; color: var(--muted); }
+  #side a.item.sub[aria-current] { color: inherit; }
+  .flow-now .line.nowrap { flex-wrap: nowrap; align-items: baseline; } .flow-now .line.nowrap .dot { flex: none; }
+  .flow-now button.stuck { font: inherit; text-align: left; background: none; border: 0; padding: 0; color: var(--bad); cursor: pointer; overflow-wrap: anywhere; }
+  .flow-now button.stuck:hover { text-decoration: underline; }
+  .reqs { display: grid; gap: 6px; margin-top: 8px; }
+  .reqs button { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font: inherit; color: inherit; text-align: left; background: none; border: 1px solid var(--line, var(--border)); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+  .reqs button:hover { border-color: var(--muted); }
   .flow-now .line { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .flow-scroll { overflow-x: auto; padding: 8px 4px 12px; }
   .flow-graph { position: relative; width: max-content; min-width: 100%; }
@@ -151,7 +165,7 @@
   .fcard { display: flex; flex-direction: column; gap: 6px; text-align: left; font: inherit; color: inherit; cursor: pointer; background: var(--surface);
            border: 1px solid var(--line); border-left: 4px solid var(--c, var(--line)); border-radius: var(--radius); padding: 10px 12px; box-shadow: var(--shadow); }
   .fcard:hover { border-color: var(--muted); border-left-color: var(--c, var(--muted)); }
-  .fcard.done { --c: var(--good); } .fcard.blocked { --c: var(--bad); } .fcard.review { --c: var(--warn); }
+  .fcard.done { --c: var(--good); } .fcard.blocked, .fcard.triage { --c: var(--bad); } .fcard.review { --c: var(--warn); }
   .fcard b { font-weight: 600; overflow-wrap: anywhere; }
   .fcard .foot { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
   .fcard.working { --c: var(--good); border-color: var(--good); animation: fflash 1.2s ease-in-out infinite; }
@@ -207,6 +221,12 @@
   .msg { max-width: 88%; padding: 7px 11px; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .msg.user { align-self: flex-end; background: var(--accent-soft); } .msg.assistant { align-self: flex-start; background: var(--surface); border: 1px solid var(--line); }
   .msg.err { border-color: var(--bad); color: var(--bad); } .msg.wait { color: var(--muted); font-style: italic; }
+  #convDialog { max-width: 900px; } #convLog { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow: auto; padding: 4px 2px; }
+  :is(#convLog, .livelog) .runhead { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); } :is(#convLog, .livelog) .ev { font-size: 12.5px; }
+  :is(#convLog, .livelog) details.step { align-self: flex-start; max-width: 96%; font-size: 13px; } :is(#convLog, .livelog) details.step summary { cursor: pointer; color: var(--muted); }
+  :is(#convLog, .livelog) details.step pre { max-height: 260px; }
+  .livelog { height: min(56vh, 520px); } .livelog .runhead:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+  .livelog details.step summary code { color: var(--text, inherit); font-size: 12.5px; }
   .chatform textarea { min-height: 62px; font-family: inherit; font-size: 14px; }
   .desk.off .bubble { border-color: var(--line); color: var(--muted); }
   details.role { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); margin-bottom: 8px; }
@@ -229,7 +249,8 @@
   @media (max-width: 860px) {
     body { display: block; }
     #side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; border-right: 0; border-bottom: 1px solid var(--line); padding: 8px 12px; }
-    #side a.item, #side button.item { width: auto; } #deptNav { display: contents; } .brand { padding: 4px 8px; } .group, #envBox { display: none; }
+    #side a.item, #side button.item { width: auto; } #deptNav { display: contents; } .brand { padding: 4px 8px; } .group, #envBox, #modeBox .help { display: none; }
+    #modeBox { margin: 0; padding: 0; border: 0; }
     #pagehead { position: static; padding: 12px 16px 0; } main { padding: 16px 16px 96px; }
     .split, .role-body, .form-grid { grid-template-columns: 1fr; } .hide-sm { display: none; }
     #saveBar { left: 12px; right: 12px; }
@@ -242,6 +263,8 @@
   <div class="brand"><i>AI</i>AI Company</div>
   <div class="group">Company</div>
   <a class="item" href="#/overview" data-nav="overview"><span class="grow">Overview</span></a>
+  <a class="item" href="#/projects" data-nav="projects"><span class="grow">Projects</span></a>
+  <div id="projectNav"></div>
   <a class="item" href="#/activity" data-nav="activity"><span class="grow">Activity</span><span class="dot ok pulse" data-live hidden></span></a>
   <a class="item" href="#/flow" data-nav="flow"><span class="grow">Flow</span><span class="dot ok pulse" data-live hidden></span></a>
   <a class="item" href="#/office" data-nav="office"><span class="grow">Office</span><span class="dot ok pulse" data-live hidden></span></a>
@@ -251,6 +274,9 @@
   <a class="item" href="#/software/team" data-nav="software"><span class="grow">Software</span><span class="badge" data-sw-pending hidden>!</span></a>
   <div id="deptNav"></div>
   <button class="item add" id="addDeptNav" type="button">+ Add department</button>
+  <div id="modeBox"><div class="group" style="padding:0 0 6px" id="modeLabel">Hermes mode</div>
+    <span class="seg" id="modeSeg" role="group" aria-labelledby="modeLabel"><button type="button" data-mode="manager" aria-pressed="false">Manager</button><button type="button" data-mode="general" aria-pressed="false">Manual</button></span>
+    <p class="help" id="modeHelp"></p></div>
   <div id="envBox" aria-label="Status of this machine"></div>
 </aside>
 
@@ -267,6 +293,14 @@
       <p class="lead">Every department is a team of Hermes agents: one lead you talk to, and specialists it hands tasks to over the task board. Nothing changes in Hermes until you apply.</p>
       <div class="cards" id="overviewCards"></div>
       <div class="card"><h2>This machine</h2><div id="overviewEnv" class="row" style="margin-top:10px"></div></div>
+    </section>
+
+    <section data-view="projects" hidden>
+      <p class="lead">A project is a name for a folder on this Mac. Agents work inside that folder, and the panel groups their tasks and your own <span class="mono">hermes</span> sessions by project.</p>
+      <div class="row" style="margin-bottom:var(--gap)"><button class="btn primary" id="projectAdd" type="button">+ New project</button><span class="grow"></span><span class="muted" id="projectsUpdated"></span></div>
+      <div class="cards" id="projectCards"></div>
+      <div class="card" id="projectSuggestBox" hidden><h2>Folders where agents already worked</h2>
+        <p class="help" style="margin:2px 0 10px">These are not projects yet. Add one to give it a name.</p><div class="row" id="projectSuggest"></div></div>
     </section>
 
     <section data-view="knowledge" hidden>
@@ -300,8 +334,10 @@
     <section data-view="flow" hidden>
       <div class="row" style="margin-bottom:var(--gap)"><span class="seg" id="flowProjects"></span><span class="grow"></span>
         <label class="row" style="gap:6px"><input type="checkbox" id="flowFollow" checked>Follow the project being worked on</label><span class="muted" id="flowUpdated"></span></div>
+      <div class="card" id="flowProject" hidden></div>
       <div class="card flow-now" id="flowNow"></div>
       <div class="card"><div class="flow-scroll"><div class="flow-graph" id="flowGraph"></div></div></div>
+      <div class="card" id="flowRequests" hidden></div>
       <p class="muted">A project is a folder. Work you do by running <span class="mono">hermes</span> in that folder is in the last column, “Direct work with you”. Read the rest left to right: a task starts when the tasks pointing to it are finished. The small labels in a box are the agents that worked on it, in order. A green flashing box and a moving line show where work is happening right now. Click a box for details.</p>
     </section>
 
@@ -331,6 +367,9 @@
         <div id="actPaperclipTasks" style="margin-top:6px"></div>
         <table id="actPaperclipAgents" style="margin-top:8px"></table>
         <p class="muted" id="actPaperclipNote" style="margin-bottom:0"></p></div>
+      <div class="card" id="actBudgetCard"><div class="row"><h2 class="grow">Monthly budget</h2><span id="actBudgetMonth" class="muted"></span></div>
+        <p class="help" style="margin:2px 0 8px">A limit in US dollars per agent and calendar month. At 80% the agent is marked; at 100% it is paused: no panel chat or new tasks, and its waiting tasks are put on hold. Work already running is not cut off. The pause ends on the 1st of next month or when you raise the limit. Leave empty for no limit.</p>
+        <table id="actBudget"></table></div>
       <div class="split halves">
         <div class="card"><h2>By agent</h2><table id="actByProfile" style="margin-top:8px"></table></div>
         <div class="card"><h2>By model</h2><table id="actByModel" style="margin-top:8px"></table></div>
@@ -444,6 +483,17 @@
   <div class="row"><h2 class="grow" id="agTitle" style="margin:0"></h2><button class="btn" data-close type="button">Close</button></div>
   <div id="agBody" style="margin-top:10px"></div>
 </dialog>
+<dialog id="convDialog">
+  <div class="row"><h2 class="grow" id="convTitle" style="margin:0"></h2><button class="btn" data-close type="button">Close</button></div>
+  <p class="row" id="convHead" style="margin:8px 0"></p>
+  <div id="convLog"></div>
+  <p class="muted" id="convNote" hidden style="margin:12px 0 0"></p>
+  <form id="convAnswer" hidden style="margin-top:12px">
+    <label for="convText"><b>Your answer</b> <span class="muted" id="convHint"></span></label>
+    <textarea id="convText" style="width:100%;margin-top:6px" placeholder="Answer the question, or tell the agent what to do next"></textarea>
+    <p class="row" style="margin:8px 0 0"><button class="btn primary" type="submit" id="convSend">Send answer and continue</button><button class="btn" type="button" id="convRetry">Retry without an answer</button></p>
+  </form>
+</dialog>
 <dialog id="keyDialog">
   <form method="dialog" id="keyForm">
     <p>New value for <b id="keyName" class="mono"></b>. <span id="keyHint"></span></p>
@@ -472,6 +522,32 @@
     <label for="nrTitle">Title</label><input id="nrTitle" required placeholder="Analyst">
     <p id="nrError" class="bad" role="alert"></p>
     <div class="row end"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary">Add role</button></div>
+  </form>
+</dialog>
+<dialog id="projectDialog">
+  <form id="projectForm" autocomplete="off">
+    <h2 id="pdTitle">New project</h2>
+    <label for="pdName">Name</label><input id="pdName" required maxlength="60" placeholder="Shop website">
+    <label for="pdFolder">Folder</label><input id="pdFolder" required spellcheck="false" placeholder="~/Projects/shop" class="mono">
+    <p class="help">The full path of a folder inside your home folder. <span class="mono">~</span> means your home folder.</p>
+    <label class="row" style="font-weight:400;gap:6px;margin-top:8px"><input type="checkbox" id="pdCreate">Create the folder if it does not exist</label>
+    <label for="pdGoal">Goal (optional)</label><textarea id="pdGoal" maxlength="500" placeholder="Why this work exists, e.g. a shop where customers can pay by card"></textarea>
+    <p class="help">Agents get the goal at the top of every task you start from this project, and leads copy it into the tasks they hand out.</p>
+    <label for="pdNote">Note (optional)</label><textarea id="pdNote" maxlength="500" placeholder="What this project is"></textarea>
+    <p id="pdError" class="bad" role="alert"></p>
+    <div class="row end"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" id="pdSave">Save project</button></div>
+  </form>
+</dialog>
+<dialog id="projectTaskDialog">
+  <form id="projectTaskForm" autocomplete="off">
+    <h2>New task in <span id="ptProject"></span></h2>
+    <p class="muted mono" id="ptFolder" style="overflow-wrap:anywhere"></p>
+    <label for="ptAgent">Give it to</label><select id="ptAgent"></select>
+    <p class="help">A lead plans the work and hands it to its team. Any other agent does the task itself.</p>
+    <label for="ptTitle">Task</label><input id="ptTitle" required maxlength="160" placeholder="Add a contact page">
+    <label for="ptBody">Details (optional)</label><textarea id="ptBody" placeholder="What should be done, and how to check it"></textarea>
+    <p id="ptError" class="bad" role="alert"></p>
+    <div class="row end"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary">Create task</button></div>
   </form>
 </dialog>
 <div id="toast" role="status"></div>
@@ -516,7 +592,8 @@ function parseHash() {
   const p = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   if (p[0] === "software") { const tab = p[1] === "policies" ? "rules" : p[1]; return { view: "dept", dept: "software", tab: DEPT_TABS.some(t => t[0] === tab) ? tab : "team" }; }
   if (p[0] === "d" && p[1]) return { view: "dept", dept: decodeURIComponent(p[1]), tab: DEPT_TABS.some(t => t[0] === p[2]) ? p[2] : "team" };
-  if (p[0] === "knowledge" || p[0] === "services" || p[0] === "activity" || p[0] === "office" || p[0] === "flow") return { view: p[0] };
+  if (p[0] === "knowledge" || p[0] === "services" || p[0] === "activity" || p[0] === "office" || p[0] === "projects") return { view: p[0] };
+  if (p[0] === "flow") return p[1] ? { view: "flow", project: decodeURIComponent(p.slice(1).join("/")) } : { view: "flow" };
   return { view: "overview" };
 }
 // The department whose Team, Models and save bar are on screen; the software department is "software".
@@ -546,6 +623,7 @@ async function navigate() {
   active?.setAttribute("aria-current", "page");
   renderHead();
   updateSaveBar();
+  renderProjectNav();
   try { await loaders[key]?.(); renderHead(); } catch (e) { toast(e.message, true); }
 }
 window.addEventListener("hashchange", navigate);
@@ -553,7 +631,7 @@ window.addEventListener("beforeunload", e => { if (draftDirty()) e.preventDefaul
 
 function renderHead() {
   const r = S.route, tabs = $("#tabs");
-  const titles = { flow: ["Flow", "which task follows which, and who is on it now"], office: ["Office", "your team at work - click anyone to see what they are doing"], activity: ["Activity", "who is working, on what, and what it cost"], overview: ["Overview", "all departments"], knowledge: ["Knowledge", "shared knowledge base"], services: ["Services", "this machine"] };
+  const titles = { projects: ["Projects", "named folders on this Mac"], flow: ["Flow", "which task follows which, and who is on it now"], office: ["Office", "your team at work - click anyone to see what they are doing"], activity: ["Activity", "who is working, on what, and what it cost"], overview: ["Overview", "all departments"], knowledge: ["Knowledge", "shared knowledge base"], services: ["Services", "this machine"] };
   let title, sub, chips = "", list = null, base = "";
   if (r.view === "dept") {
     const loaded = S.d && S.dept === r.dept;
@@ -589,7 +667,7 @@ loaders.overview = async () => {
   const [c, team] = await Promise.all([loadCompany(true), api("/api/team").catch(() => null)]);
   const cards = [];
   if (team) cards.push(`<a class="card" href="#/software/team"><div class="row"><h2 class="grow">Software</h2><span class="muted mono">team.yaml</span></div>
-    <p class="muted grow" style="margin:0">${Object.keys(team.roles).length} roles, the manager routes work to them. Has its own routing, policies and the knowledge base.</p>
+    <p class="muted grow" style="margin:0">${Object.keys(team.roles).length} roles, the manager sends software work to the lead. Has its own routing, policies and the knowledge base.</p>
     <div class="row">${S.swPending ? chip("warn", "changes not applied") : chip("ok", "no pending changes")}</div></a>`);
   for (const d of c.departments) cards.push(`<a class="card" href="#/d/${enc(d.name)}/team"><div class="row"><h2 class="grow">${esc(d.title)}</h2><span class="muted mono">${esc(d.name)}</span></div>
     ${d.error ? `<p class="bad grow" style="margin:0">${esc(d.error)}</p>` : `<p class="muted grow" style="margin:0">${d.enabled} roles, lead <span class="mono">${esc(d.lead)}</span>. Talk to it with <span class="mono">hermes -p ${esc(d.lead)}</span>.</p>
@@ -625,9 +703,10 @@ const dur = s => s == null ? "–" : s < 60 ? s + "s" : s < 3600 ? Math.floor(s 
 const when = t => t ? new Date(t * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "–";
 const cost = u => !u || u.total == null ? "–" : (u.cost_unknown && !u.cost ? "unknown" : "~$" + u.cost.toFixed(u.cost < 1 ? 3 : 2) + (u.cost_unknown ? "+" : ""));
 const usageLine = u => u && u.total != null ? `in ${tok(u.input)} · out ${tok(u.output)} · cached ${tok(u.cache_read)}` : "no usage recorded";
-const STATUS = { done: ["ok", "done"], running: ["warn", "running"], review: ["warn", "in review"], blocked: ["bad", "blocked"], ready: ["", "ready"], todo: ["", "waiting"], triage: ["", "triage"], scheduled: ["", "scheduled"] };
+const STATUS = { done: ["ok", "done"], running: ["warn", "running"], review: ["warn", "in review"], blocked: ["bad", "blocked"], ready: ["", "ready"], todo: ["", "waiting"], triage: ["bad", "stopped"], scheduled: ["", "scheduled"] };
 const OUTCOME = { completed: "ok", review_requested: "ok", changes_requested: "warn", crashed: "bad", timed_out: "bad", gave_up: "bad", spawn_failed: "bad", stale: "bad", reclaimed: "warn", blocked: "bad" };
 const CAUSE = { out_of_credits: "no credits", bad_key: "API key rejected", rate_limited: "rate limited", model_unavailable: "model unavailable" };
+const causeNow = c => c === "out_of_credits" && C.data && C.data.left > 0 ? "stopped when the credit ran out" : CAUSE[c] || c;
 const outText = r => r.cause ? CAUSE[r.cause] || r.cause : (r.outcome || r.status).replace(/_/g, " ");
 const shortModel = m => (m || "?").split("/").pop();
 
@@ -638,6 +717,145 @@ const directWorking = d => (d.direct || []).filter(x => x.state === "working");
 const directTitle = x => x.title || (x.messages ? "untitled chat" : "new chat, nothing asked yet");
 const folderName = w => w ? w.replace(/\/+$/, "").split("/").pop() : "";
 
+// Retry: a blocked task goes back in the queue and the dispatcher starts it again.
+const retryButton = t => `<p class="row">${t.status === "blocked" ? `<button type="button" class="btn" data-conv-task="${esc(t.id)}" data-answer="1">Answer</button><button type="button" class="btn" data-retry-task="${esc(t.id)}">Retry</button>` : ""}<button type="button" class="btn" data-conv-task="${esc(t.id)}">All messages</button>${t.status !== "running" ? `<span class="grow"></span><button type="button" class="btn danger" data-archive-task="${esc(t.id)}" title="Take this task off the board. Hermes keeps it in its archive.">Archive</button>` : ""}</p>`;
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-archive-task]"); if (!b) return;
+  e.preventDefault();
+  if (!await ask(`Archive task ${b.dataset.archiveTask}? It leaves the board and the flow. Tasks that wait for it will not start by themselves.`)) return;
+  b.disabled = true;
+  try {
+    await api(`/api/tasks/${enc(b.dataset.archiveTask)}/archive`, { method: "POST" });
+    toast("Task archived.");
+    if ($("#agentDialog").open) $("#agentDialog").close();
+    const again = { activity: refreshActivity, flow: refreshFlow, office: refreshOffice }[S.route.view];
+    if (again) again(true);
+  } catch (err) { b.disabled = false; toast(err.message, true); }
+});
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-retry-task]"); if (!b) return;
+  e.preventDefault();
+  const id = b.dataset.retryTask, t = [A.data, O.data].flatMap(d => d?.tasks || []).find(x => x.id === id);
+  if (t?.cause && !confirm(`The last run stopped because: ${CAUSE[t.cause] || t.cause}.\nUntil that is fixed the task will fail again the same way.\n\nRetry anyway?`)) return;
+  b.disabled = true;
+  try {
+    const r = await api(`/api/tasks/${enc(id)}/retry`, { method: "POST" });
+    toast(`Task ${r.task_id} is back in the queue${r.assignee ? " for " + r.assignee : ""}.`);
+    if ($("#agentDialog").open) $("#agentDialog").close();
+    if ($("#convDialog").open) $("#convDialog").close();
+    const again = { activity: refreshActivity, flow: refreshFlow, office: refreshOffice }[S.route.view];
+    if (again) again(true);
+  } catch (err) { b.disabled = false; toast(err.message, true); }
+});
+// ---- one task's full conversation: every run's messages and tool calls, comments and board events ----
+const CV = { id: null, sig: "", timer: null };
+// What a tool call does, in one line: the command, the file, or its first argument.
+function callHint(c) {
+  let a; try { a = JSON.parse(c.arguments); } catch { return ""; }
+  if (!a || typeof a !== "object") return "";
+  const v = a.command ?? a.path ?? a.file_path ?? a.query ?? a.url ?? a.title ?? Object.values(a).find(x => typeof x === "string");
+  return typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, 140) : "";
+}
+// One stored message: what was said, the thinking behind it, the tool calls it made, or a tool's result. `hint` adds the command to each call.
+function msgHtml(m, hint) {
+  if (m.role === "tool") return `<details class="step"><summary>↳ result of ${esc(m.tool || "tool")}</summary><pre>${esc(m.text)}</pre></details>`;
+  if (m.role !== "user" && m.role !== "assistant") return "";
+  return (m.thinking ? `<details class="step"><summary>thinking</summary><pre>${esc(m.thinking)}</pre></details>` : "")
+    + (m.text.trim() ? `<div class="msg ${m.role}">${esc(m.text.trim())}</div>` : "")
+    + m.calls.map(c => { const h = hint ? callHint(c) : ""; return `<details class="step"><summary>🔧 ${esc(c.name)}${h ? ` <code>${esc(h)}</code>` : ""}</summary><pre>${esc(c.arguments)}</pre></details>`; }).join("");
+}
+function convItem(i) {
+  if (i.kind === "comment") return `<div class="msg ${i.author === "user" ? "user" : "assistant"}"><span class="muted">${esc(i.author)} · ${when(i.at)}</span>\n${esc(i.text)}</div>`;
+  if (i.kind === "event") return `<div class="ev muted">· ${when(i.at)} · ${esc(i.event.replace(/_/g, " "))}${i.text ? ": " + esc(i.text) : ""}</div>`;
+  const live = i.status === "running";
+  const body = i.messages.map(m => msgHtml(m)).join("");
+  return `<div class="runhead row"><b>${esc(i.profile)}</b><span class="mono muted">${esc(shortModel(i.model))}</span>${chip(live ? "warn" : OUTCOME[i.outcome] || "", live ? "working now" : (i.outcome || i.status).replace(/_/g, " "))}<span class="muted">${when(i.at)}</span></div>`
+    + (body || `<div class="ev muted">No messages were stored for this run.</div>`)
+    + (i.error ? `<div class="msg assistant err">${esc(i.error)}</div>` : "") + (i.summary ? `<div class="msg assistant"><span class="muted">result</span>\n${esc(i.summary)}</div>` : "");
+}
+async function loadConv() {
+  const d = await api(CV.url), x = d.session, t = d.task || {}, [kind, text] = x ? DIRECT_STATE[x.state] : STATUS[t.status] || ["", t.status];
+  $("#convTitle").textContent = x ? directTitle({ ...x, messages: d.items[0].messages.length }) : t.title;
+  $("#convHead").innerHTML = x ? `${chip(kind, text)}<span class="mono muted">${esc(x.id)}</span><span class="muted">${esc(x.role)} · direct session${x.cwd ? " in " + esc(folderName(x.cwd)) : ""}</span>`
+    : `${chip(kind, text)}<span class="mono muted">${esc(t.id)}</span><span class="muted">assigned to ${esc(t.assignee || "nobody")}</span>`;
+  CV.session = x || null;
+  const busy = CV.job?.state === "running";
+  $("#convAnswer").hidden = x ? x.state !== "ended" || busy : t.status !== "blocked";
+  $("#convRetry").hidden = !!x;
+  $("#convSend").textContent = x ? "Send" : "Send answer and continue";
+  $("#convHint").textContent = x ? `- continues this conversation with ${x.role}` : "- it is added to the task and the agent continues with it";
+  const note = !x ? "" : busy || x.state === "working" ? `${x.role} is working on it… the messages above update by themselves.`
+    : x.state === "open" ? "This session is open in a terminal, so you answer it there. When you close it there, you can continue it here." : "";
+  $("#convNote").textContent = note; $("#convNote").hidden = !note;
+  const sig = JSON.stringify(d.items.map(i => [i.kind, i.status, i.messages?.length]));
+  if (sig === CV.sig) return;
+  const log = $("#convLog"), open = new Set($$("#convLog details").map((el, n) => el.open ? n : -1)), atEnd = !CV.sig || log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  log.innerHTML = (t.body ? `<div class="msg user"><span class="muted">task</span>\n${esc(t.body)}</div>` : "") + (d.items.map(convItem).join("") || `<p class="muted">Nothing has happened on this task yet.</p>`);
+  $$("#convLog details").forEach((el, n) => { if (open.has(n)) el.open = true; });
+  if (atEnd) log.scrollTop = log.scrollHeight;
+  CV.sig = sig;
+}
+async function openConv(id, answer, url) {
+  CV.id = id; CV.url = url || `/api/tasks/${enc(id)}/conversation`; CV.sig = ""; CV.job = null; $("#convLog").innerHTML = ""; $("#convText").value = "";
+  try { await loadConv(); } catch (e) { return toast(e.message, true); }
+  if (!$("#convDialog").open) $("#convDialog").showModal();
+  if (answer && !$("#convAnswer").hidden) $("#convText").focus();
+  clearInterval(CV.timer);
+  CV.timer = setInterval(() => { if (!$("#convDialog").open) { clearInterval(CV.timer); CV.timer = null; return; } if (!document.hidden) loadConv().catch(() => {}); }, 4000);
+}
+document.addEventListener("click", e => { const b = e.target.closest("[data-conv-task]"); if (b) { e.preventDefault(); openConv(b.dataset.convTask, !!b.dataset.answer); } });
+// A direct session (hermes in a folder, panel chat): the same view, read-only.
+const openSession = id => { const x = [A.data, F.data, O.data].flatMap(d => d?.direct || []).find(x => x.id === id); if (x) openConv(id, false, `/api/sessions/${enc(x.profile)}/${enc(id)}/conversation`); };
+document.addEventListener("click", e => { const b = e.target.closest("[data-direct]"); if (b) { e.preventDefault(); openSession(b.dataset.direct); } });
+document.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches?.("[data-direct]")) { e.preventDefault(); openSession(e.target.dataset.direct); } });
+$("#convRetry").onclick = e => { e.currentTarget.dataset.retryTask = CV.id; };
+$("#convAnswer").onsubmit = async e => {
+  e.preventDefault();
+  const text = $("#convText").value.trim(); if (!text) return toast("Write an answer first", true);
+  if (CV.session) return answerSession(text);
+  $("#convSend").disabled = true;
+  try {
+    const r = await api(`/api/tasks/${enc(CV.id)}/answer`, { method: "POST", body: { text } });
+    toast(`Answer sent. Task ${r.task_id} continues${r.assignee ? " with " + r.assignee : ""}.`);
+    $("#convText").value = ""; CV.sig = ""; await loadConv();
+    const again = { activity: refreshActivity, flow: refreshFlow, office: refreshOffice }[S.route.view];
+    if (again && !$("#agentDialog").open) again(true);
+  } catch (err) { toast(err.message, true); }
+  $("#convSend").disabled = false;
+};
+// Answer a direct session from the panel: one more turn in the same conversation, run by the panel's agent chat.
+async function answerSession(text) {
+  const x = CV.session, id = CV.id;
+  try { CV.job = await api(`/api/agents/${enc(x.profile)}/chat`, { method: "POST", body: { message: text, session_id: x.id, folder: x.cwd || "" } }); }
+  catch (err) { return toast(err.message, true); }
+  $("#convText").value = ""; toast(`Sent to ${x.role}.`); loadConv().catch(() => {});
+  const poll = setInterval(async () => {
+    if (CV.id !== id || !$("#convDialog").open) return clearInterval(poll);
+    let j; try { j = await api(`/api/agents/chat/${CV.job.id}`); } catch (err) { j = { state: "error", error: err.message }; }
+    if (j.state === "running") return;
+    clearInterval(poll); CV.job = null;
+    if (j.error) toast(j.error, true);
+    if (j.session_id && j.session_id !== CV.id) { CV.id = j.session_id; CV.url = `/api/sessions/${enc(x.profile)}/${enc(j.session_id)}/conversation`; }   // Hermes may continue under a new id
+    CV.sig = ""; loadConv().catch(() => {});
+  }, 1500);
+}
+// ---- project folder as a drop-down (the projects from the Projects page) ----
+async function loadProjectList() {
+  if (Date.now() - (P.at || 0) < 60000) return;
+  try { P.list = (await api("/api/projects")).projects; P.at = Date.now(); } catch {}
+}
+function folderSelect(attrs, current) {
+  const known = P.list.some(p => p.folder === current);
+  return `<select ${attrs} data-folder-select aria-label="Project"><option value="">No project folder</option>${
+    P.list.map(p => `<option value="${esc(p.folder)}" ${p.folder === current ? "selected" : ""} title="${esc(p.folder)}">${esc(p.name)}</option>`).join("")}${
+    current && !known ? `<option value="${esc(current)}" selected>${esc(current)}</option>` : ""}<option value="__other">Other folder…</option></select>`;
+}
+document.addEventListener("change", e => {
+  const sel = e.target.closest?.("[data-folder-select]"); if (!sel || sel.value !== "__other") return;
+  const path = (prompt("Folder inside your home folder:", "~/") || "").trim();
+  if (!path) { sel.value = ""; return; }
+  const o = new Option(path, path); sel.add(o, sel.options.length - 1); sel.value = path;
+});
 function renderActivity(d) {
   A.data = d;
   const sel = $("#actDept");
@@ -647,7 +865,7 @@ function renderActivity(d) {
   const open = (c.running || 0) + (c.ready || 0) + (c.todo || 0) + (c.review || 0);
   $("#actStats").innerHTML = [
     [d.working ?? d.running.length, "agents working now"],
-    [open ? `${open} open` : (c.blocked ? "stopped" : "all done"), `${c.done || 0} done · ${c.blocked || 0} blocked`],
+    [open ? `${open} open` : (c.blocked ? `${c.blocked} blocked` : "all done"), `tasks: ${c.done || 0} done · ${c.blocked || 0} blocked · ${open} open`],
     [tok(t.total || 0), `tokens ${label}`],
     [tok((t.input || 0) + (t.output || 0)), `new tokens (in ${tok(t.input || 0)} · out ${tok(t.output || 0)})`],
     [t.total ? cost(t) : "$0", `estimated cost ${label}`],
@@ -675,7 +893,7 @@ function renderActivity(d) {
   $("#actDirect").innerHTML = direct.length ? `<table><thead><tr><th>State</th><th>Agent</th><th>What</th><th>Project folder</th><th>Started</th><th>Took</th><th class="num">Messages</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead><tbody>${
     direct.map(x => { const [kind, text] = DIRECT_STATE[x.state];
       return `<tr><td>${chip(kind, text)}</td><td><b>${esc(x.role)}</b><div class="muted">${esc(SOURCE[x.source] || x.source)}</div></td>
-      <td>${esc(directTitle(x))}${x.state === "working" ? `<div class="muted">${esc(friendly(x.activity))}</div>` : ""}</td>
+      <td><a href="#" data-direct="${esc(x.id)}">${esc(directTitle(x))}</a>${x.state === "working" ? `<div class="muted">${esc(friendly(x.activity))}</div>` : ""}</td>
       <td class="mono" title="${esc(x.cwd)}">${esc(folderName(x.cwd) || "–")}</td><td class="muted">${when(x.started_at)}</td><td>${dur(x.seconds)}</td>
       <td class="num">${x.messages ?? 0}<div class="muted">${x.tool_calls ?? 0} tools</div></td><td class="num">${tok(x.usage?.total)}</td><td class="num">${cost(x.usage)}</td></tr>`; }).join("")}</tbody></table>`
     : `<p class="muted" style="margin:0">Nothing yet in this period. Start <span class="mono">hermes</span> in a project folder and it appears here.</p>`;
@@ -688,7 +906,7 @@ function renderActivity(d) {
       ${chip(kind, text)}<span class="mono muted">${esc(t.id)}</span><b class="grow">${esc(t.title)}</b>
       <span class="muted">${esc(t.assignee || "unassigned")}</span><span class="num">${tok(t.usage.total)} tok</span><span class="num">${cost(t.usage)}</span></summary>
       <div class="body">
-        ${t.blocked_reason ? `<p class="bad">Blocked: ${esc(t.blocked_reason)}</p>` : ""}
+        ${t.blocked_reason ? `<p class="bad">Blocked: ${esc(t.blocked_reason)}</p>` : ""}${retryButton(t)}
         <p class="muted">Created ${when(t.created_at)} by ${esc(t.created_by || "?")} · started ${when(t.started_at)} · ${t.completed_at ? "finished " + when(t.completed_at) : "not finished"}${t.workspace ? ` · <span class="mono">${esc(t.workspace)}</span>` : ""}</p>
         ${flow ? `<p class="flow">${flow}</p>` : `<p class="muted">Not started yet.</p>`}
         ${t.runs.length ? `<table><thead><tr><th>Agent</th><th>Model</th><th>Result</th><th>Started</th><th>Took</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead><tbody>${t.runs.map(r => `<tr>
@@ -724,7 +942,24 @@ function renderActivity(d) {
   $("#actByModel").innerHTML = table(d.by_model, "Model", r => `<span class="mono">${esc(r.model)}</span>`);
   $("#actUpdated").textContent = "updated " + new Date(d.now * 1000).toLocaleTimeString();
 }
+function renderBudget(b) {
+  const month = new Date(b.month_start * 1000).toLocaleString(undefined, { month: "long", year: "numeric" });
+  $("#actBudgetMonth").textContent = "spent in " + month;
+  const money = v => "$" + v.toFixed(v < 1 ? 3 : 2);
+  const rows = b.agents.filter(a => a.budget || a.spent || a.profile === "default");
+  $("#actBudget").innerHTML = `<thead><tr><th>Agent</th><th class="num">Spent</th><th class="num">Limit ($)</th><th></th></tr></thead><tbody>${rows.map(a => `<tr>
+    <td><b>${esc(a.profile === "default" ? "manager (default)" : a.profile)}</b> <span class="muted">${esc(a.dept)}</span></td>
+    <td class="num">${money(a.spent)}${a.unpriced ? ` <span class="muted" title="${a.unpriced} session(s) use a model Hermes cannot price, so the real spend is higher">+ unpriced</span>` : ""}</td>
+    <td class="num"><input type="number" min="0" step="0.5" data-budget="${esc(a.profile)}" value="${a.budget || ""}" placeholder="none" style="width:90px"></td>
+    <td>${a.state === "over" ? chip("bad", "paused: over budget") : a.state === "near" ? chip("warn", "near the limit") : a.state === "ok" ? chip("ok", `${Math.round(100 * a.spent / a.budget)}%`) : ""}</td></tr>`).join("")}</tbody>`;
+}
+$("#actBudget").addEventListener("change", async e => {
+  const input = e.target.closest("input[data-budget]"); if (!input) return;
+  try { renderBudget(await api(`/api/budgets/${enc(input.dataset.budget)}`, { method: "PUT", body: { monthly_usd: input.value ? Number(input.value) : null } })); toast(input.value ? "Budget saved" : "Budget removed"); }
+  catch (err) { toast(err.message, true); }
+});
 async function refreshActivity(quiet) {
+  if (!document.activeElement?.matches?.("#actBudget input")) api("/api/budgets").then(renderBudget).catch(() => {});
   try { renderActivity(await api(`/api/activity?range=${enc(A.range)}&department=${enc(A.dept)}`)); }
   catch (e) { if (!quiet) throw e; $("#actUpdated").textContent = "update failed: " + e.message; }
 }
@@ -738,20 +973,118 @@ $("#actDept").onchange = e => { A.dept = e.target.value; refreshActivity().catch
 // Sidebar "live" dot, even when another page is open.
 setInterval(async () => { if (S.route.view === "activity" || document.hidden) return; try { const d = await api("/api/activity?range=today"); $$("[data-live]").forEach(e => e.hidden = !(d.working ?? d.running.length)); } catch {} }, 20000);
 
+// ================= mode: manager or general =================
+const MODE = { value: null, busy: false };
+const MODE_HELP = { manager: "Plain hermes hands the work to the team leads, on the manager's model.", general: "Plain hermes does the work itself, without the team, on the general agent's model." };
+function renderMode() {
+  $$("#modeSeg button").forEach(b => { b.setAttribute("aria-pressed", b.dataset.mode === MODE.value); b.disabled = MODE.busy; });
+  $("#modeHelp").textContent = MODE.busy ? "Switching…" : MODE_HELP[MODE.value] || "";
+}
+async function loadMode() { try { MODE.value = (await api("/api/mode")).mode; } catch { MODE.value = null; } renderMode(); }
+$("#modeSeg").addEventListener("click", async e => {
+  const want = e.target.closest("button")?.dataset.mode; if (!want || want === MODE.value || MODE.busy) return;
+  const text = want === "general" ? "Switch to manual mode? When you run hermes it will do the work itself, on the general agent's model, and will not hand tasks to the team. The other agents and the task board stay as they are."
+    : "Switch to manager mode? When you run hermes it will plan the work and hand tasks to the team again.";
+  if (!await ask(text)) return;
+  MODE.busy = true; renderMode();
+  try { const r = await api("/api/mode", { method: "POST", body: { mode: want } }); MODE.value = r.mode; toast(`${want === "general" ? "Manual" : "Manager"} mode is on. ${r.note || ""}`); refreshPending().catch(() => {}); }
+  catch (err) { toast(err.message, true); }
+  MODE.busy = false; renderMode();
+});
+
+// ================= projects =================
+const ago = t => { if (!t) return "no activity yet"; const s = Date.now() / 1000 - t; return s < 90 ? "just now" : s < 3600 ? Math.round(s / 60) + " min ago" : s < 86400 ? Math.round(s / 3600) + " h ago" : Math.round(s / 86400) + " days ago"; };
+function renderProjects(r) {
+  P.list = r.projects; P.suggestions = r.suggestions; renderProjectNav();
+  $("#projectsUpdated").textContent = "activity of the last 30 days";
+  $("#projectCards").innerHTML = r.projects.length ? r.projects.map(p => `<div class="card pcard ${p.working ? "working" : ""}" data-project="${esc(p.id)}">
+      <div class="row"><h2 class="grow">${esc(p.name)}</h2>${p.working ? `<span class="dot ok pulse"></span>${chip("ok", "working now")}` : ""}</div>
+      <div class="folder" title="${esc(p.folder)}">${esc(p.folder.replace(r.home, "~"))}${p.branch ? ` · ${esc(p.branch)}` : ""}</div>
+      ${p.goal ? `<p style="margin:0"><b>Goal:</b> ${esc(p.goal)}</p>` : ""}
+      ${p.note ? `<p style="margin:0">${esc(p.note)}</p>` : ""}
+      <div class="row grow" style="align-items:flex-start">${!p.exists ? chip("bad", "folder is missing") : ""}${chip("", `${p.tasks} task${p.tasks === 1 ? "" : "s"}`)}${p.open_tasks ? chip("warn", `${p.open_tasks} open`) : ""}${p.blocked ? chip("bad", `${p.blocked} blocked`) : ""}${chip("", `${p.sessions} direct session${p.sessions === 1 ? "" : "s"}`)}</div>
+      <div class="muted">${esc(ago(p.last))}${p.cost ? ` · ~$${p.cost.toFixed(p.cost < 1 ? 3 : 2)}` : ""}</div>
+      <div class="row"><button class="btn primary" data-act="task" ${p.exists ? "" : "disabled"}>New task</button><button class="btn" data-act="flow">Flow</button><button class="btn" data-act="copy" title="Copy the command that starts Hermes in this folder">Copy command</button>
+        <span class="grow"></span><button class="btn" data-act="edit">Edit</button><button class="btn danger" data-act="remove">Remove</button></div></div>`).join("")
+    : `<div class="card"><b>No projects yet.</b><p class="muted" style="margin:6px 0 0">Press “New project” and give a folder a name${r.suggestions.length ? ", or add one of the folders below" : ""}.</p></div>`;
+  $("#projectSuggestBox").hidden = !r.suggestions.length;
+  $("#projectSuggest").innerHTML = r.suggestions.map((s, i) => `<button class="btn" data-suggest="${i}" title="${esc(s.folder)}">+ ${esc(s.name)} <span class="muted">${esc(ago(s.last))}</span></button>`).join("");
+}
+loaders.projects = async () => renderProjects(await api("/api/projects"));
+function openProjectDialog(p, preset) {
+  P.edit = p ? p.id : null;
+  $("#pdTitle").textContent = p ? "Edit project" : "New project"; $("#pdError").textContent = "";
+  $("#pdName").value = p?.name || preset?.name || ""; $("#pdFolder").value = p?.folder || preset?.folder || ""; $("#pdNote").value = p?.note || ""; $("#pdGoal").value = p?.goal || ""; $("#pdCreate").checked = false;
+  $("#projectDialog").showModal();
+}
+$("#projectAdd").onclick = () => openProjectDialog(null);
+$("#projectSuggest").addEventListener("click", e => { const b = e.target.closest("[data-suggest]"); if (b) openProjectDialog(null, P.suggestions[Number(b.dataset.suggest)]); });
+$("#projectForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const body = { name: $("#pdName").value, folder: $("#pdFolder").value, note: $("#pdNote").value, goal: $("#pdGoal").value, create: $("#pdCreate").checked };
+  try { renderProjects(await api(P.edit ? `/api/projects/${enc(P.edit)}` : "/api/projects", { method: P.edit ? "PUT" : "POST", body })); $("#projectDialog").close(); toast(P.edit ? "Project saved" : "Project added"); }
+  catch (err) { $("#pdError").textContent = err.message; }
+});
+$("#projectCards").addEventListener("click", async e => {
+  const b = e.target.closest("button[data-act]"), p = b && P.list.find(x => x.id === b.closest("[data-project]").dataset.project); if (!p) return;
+  const act = b.dataset.act;
+  if (act === "edit") openProjectDialog(p);
+  else if (act === "flow") location.hash = flowHref(p.folder);
+  else if (act === "copy") {
+    const cmd = `cd "${p.folder}" && hermes`;
+    try { await navigator.clipboard.writeText(cmd); toast(`Copied: ${cmd}  (${MODE.value === "general" ? "general" : "manager"} mode)`); } catch { toast(cmd); }
+  } else if (act === "remove") {
+    if (!await ask(`Remove “${p.name}” from the list of projects? The folder and its files are not touched.`)) return;
+    try { renderProjects(await api(`/api/projects/${enc(p.id)}`, { method: "DELETE" })); toast("Removed from the list"); } catch (err) { toast(err.message, true); }
+  } else if (act === "task") openProjectTask(p);
+});
+async function openProjectTask(p) {
+  {
+    P.task = p; $("#ptProject").textContent = p.name; $("#ptFolder").textContent = p.folder; $("#ptError").textContent = ""; $("#projectTaskForm").reset();
+    try {
+      const d = await api("/api/activity?range=today"), lead = a => a.role === "manager" || /-lead$/.test(a.role);
+      const ready = d.agents.filter(a => a.installed && a.enabled !== false), group = (label, list) => list.length ? `<optgroup label="${label}">${list.map(a => `<option value="${esc(a.profile)}">${esc(a.role)} (${esc(a.dept)})</option>`).join("")}</optgroup>` : "";
+      $("#ptAgent").innerHTML = group("Leads: plan and hand out", ready.filter(lead)) + group("Does it itself", ready.filter(a => !lead(a)));
+    } catch (err) { $("#ptError").textContent = err.message; }
+    $("#projectTaskDialog").showModal();
+  }
+}
+$("#projectTaskForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  try { const r = await api(`/api/agents/${enc($("#ptAgent").value)}/task`, { method: "POST", body: { title: $("#ptTitle").value, body: $("#ptBody").value, folder: P.task.folder } });
+    $("#projectTaskDialog").close(); toast(`Task ${r.task_id} created for ${r.assignee}. Watch it in the project's flow.`); if (S.route.view === "flow") refreshFlow(true); else loaders.projects(); }
+  catch (err) { $("#ptError").textContent = err.message; }
+});
+
 // ================= flow =================
 const F = { timer: null, project: null, data: null, sig: "", seen: null };
-const projectName = w => w ? w.replace(/\/+$/, "").split("/").pop() : "no project folder";
+const P = { list: [], suggestions: [], edit: null, task: null };
+// The registered project a folder belongs to (the one with the longest matching folder), if any.
+const projectFor = w => !w ? null : P.list.filter(p => w === p.folder || w.startsWith(p.folder.replace(/\/+$/, "") + "/")).sort((a, b) => b.folder.length - a.folder.length)[0] || null;
+const projectKey = w => (projectFor(w) || {}).folder || w || "";
+const projectName0 = w => w ? w.replace(/\/+$/, "").split("/").pop() : "no project folder";
+const projectName = w => (P.list.find(p => p.folder === w) || {}).name || projectName0(w);
+// Every project has its own flow page: #/flow/<project id>, or the folder for a folder that is not a registered project.
+const flowHref = w => "#/flow/" + enc((P.list.find(p => p.folder === w) || {}).id || w || "");
+const routeProject = () => S.route.view === "flow" && S.route.project != null ? ((P.list.find(p => p.id === S.route.project) || {}).folder ?? S.route.project) : null;
+function renderProjectNav() {
+  $("#projectNav").innerHTML = P.list.map(p => `<a class="item sub" href="${flowHref(p.folder)}" data-project-nav="${esc(p.folder)}"><span class="grow">${esc(p.name)}</span></a>`).join("");
+  const now = routeProject();
+  $$("#projectNav a").forEach(a => a.toggleAttribute("aria-current", a.dataset.projectNav === now));
+}
+const REQUEST = "[request]";   // a task from one team's lead to another's (departments/engine/dept.py REQUEST_TAG)
+const REQ_STATE = { done: ["ok", "answered"], running: ["warn", "being answered"], blocked: ["bad", "blocked"], triage: ["bad", "stopped"], review: ["warn", "in review"] };
 function flowProjects(d) {
   const groups = new Map();
   for (const t of d.tasks) {
-    const key = t.workspace || "";
+    const key = projectKey(t.workspace);
     if (!groups.has(key)) groups.set(key, { key, name: projectName(key), tasks: [], direct: [], last: 0, running: 0 });
     const g = groups.get(key); g.tasks.push(t);
     g.last = Math.max(g.last, t.created_at || 0, t.started_at || 0, t.completed_at || 0);
     if (d.running.some(r => r.task_id === t.id)) g.running++;
   }
   for (const x of d.direct || []) {
-    const key = x.cwd || "";
+    const key = projectKey(x.cwd);
     if (!groups.has(key)) groups.set(key, { key, name: projectName(key), tasks: [], direct: [], last: 0, running: 0 });
     const g = groups.get(key); g.direct.push(x);
     g.last = Math.max(g.last, x.started_at || 0, x.ended_at || 0, x.activity_at || 0);
@@ -786,18 +1119,18 @@ function flowCard(d, t, changed) {
   const steps = turns.map(x => x.kind === "now" ? `<span class="chip now">${esc(x.profile)} ●</span>`
     : `<span class="chip ${x.kind}" title="${esc(x.text)}">${esc(x.profile)} ${x.kind === "ok" ? "✓" : x.kind === "bad" ? "✗" : "↺"}${x.n > 1 ? " ×" + x.n : ""}</span>`);
   const last = t.runs[t.runs.length - 1];
-  if (!run && t.status !== "done" && t.assignee && (!last || last.profile !== t.assignee || t.status !== "blocked")) steps.push(`<span class="chip next">next: ${esc(t.assignee)}</span>`);
-  const foot = run ? `${dur(run.seconds)} · ${friendly(run.activity)}` : t.status === "blocked" ? `Blocked: ${t.blocked_reason || "see details"}`
+  if (!run && t.status !== "done" && t.status !== "triage" && t.assignee && (!last || last.profile !== t.assignee || t.status !== "blocked")) steps.push(`<span class="chip next">next: ${esc(t.assignee)}</span>`);
+  const foot = run ? `${dur(run.seconds)} · ${friendly(run.activity)}` : t.status === "blocked" ? `Blocked: ${t.blocked_reason || "see details"}` : t.status === "triage" ? "Stopped: it blocked twice for the same reason. Archive it, or give the job again."
     : t.status === "done" ? `finished ${when(t.completed_at)} · ${cost(t.usage)}` : t.parents.length ? "waits for the tasks before it" : "waiting to start";
   return `<button type="button" class="fcard ${esc(t.status)} ${run ? "working" : ""} ${changed ? "changed" : ""}" data-flow-task="${esc(t.id)}" aria-label="${esc(t.title)}, ${run ? "being worked on by " + run.profile : text}">
     <span class="row">${run ? chip("ok", "working now") : chip(kind, text)}<span class="mono muted">${esc(t.id)}</span></span>
-    <b>${esc(t.title)}</b><span class="steps">${steps.join("<i>→</i>")}</span><span class="foot ${t.status === "blocked" && !run ? "bad" : ""}">${esc(foot)}</span></button>`;
+    <b>${esc(t.title)}</b><span class="steps">${steps.join("<i>→</i>")}</span><span class="foot ${(t.status === "blocked" || t.status === "triage") && !run ? "bad" : ""}">${esc(foot)}</span></button>`;
 }
 function directCard(x) {
   const [kind, text] = DIRECT_STATE[x.state];
   const foot = x.state === "working" ? `${dur(x.seconds)} · ${friendly(x.activity)}` : x.state === "open" ? `open for ${dur(x.seconds)} · ${x.messages ?? 0} messages`
     : `${when(x.started_at)} · ${dur(x.seconds)} · ${tok(x.usage?.total)} tokens · ${cost(x.usage)}`;
-  return `<div class="fcard ${x.state === "working" ? "working" : x.state === "ended" ? "done" : "review"}" data-direct="${esc(x.id)}">
+  return `<div class="fcard ${x.state === "working" ? "working" : x.state === "ended" ? "done" : "review"}" data-direct="${esc(x.id)}" role="button" tabindex="0" aria-label="${esc(directTitle(x))}, ${esc(text)}">
     <span class="row">${chip(kind, text)}<span class="muted">${esc(SOURCE[x.source] || x.source)}</span></span>
     <b>${esc(directTitle(x))}</b><span class="steps"><span class="chip ${x.state === "working" ? "now" : x.state === "ended" ? "ok" : ""}">${esc(x.role)}${x.state === "working" ? " ●" : ""}</span></span>
     <span class="foot">${esc(foot)}</span></div>`;
@@ -822,17 +1155,44 @@ function renderFlow(d) {
   const projects = flowProjects(d), follow = $("#flowFollow").checked;
   $$("[data-live]").forEach(e => e.hidden = !(d.working ?? d.running.length));
   $("#flowUpdated").textContent = "updated " + new Date(d.now * 1000).toLocaleTimeString();
-  const blocked = d.tasks.filter(t => t.status === "blocked");
-  const dw = directWorking(d);
-  $("#flowNow").innerHTML = d.running.length || dw.length ? dw.map(x => `<div class="line"><span class="dot ok pulse"></span><span><b>${esc(x.role)}</b> is working with you on “${esc(directTitle(x))}”</span>
-      <span class="muted">${esc(folderName(x.cwd) || "no folder")} · ${dur(x.seconds)} · ${esc(friendly(x.activity))} · ${tok(x.usage?.total)} tokens</span></div>`).join("") + d.running.map(r => `<div class="line"><span class="dot ok pulse"></span><span><b>${esc(r.profile)}</b> is working on “${esc(r.title)}”</span>
-      <span class="muted">${esc(projectName((d.tasks.find(t => t.id === r.task_id) || {}).workspace))} · ${dur(r.seconds)} · ${esc(friendly(r.activity))} · ${tok(r.usage?.total)} tokens</span></div>`).join("")
-    : `<div class="line"><span class="dot"></span><b>No agent is working right now.</b>${blocked.length ? `<span class="bad">${blocked.length} task${blocked.length === 1 ? " is" : "s are"} blocked${blocked[0].blocked_reason ? ": " + esc(blocked[0].blocked_reason) : ""}</span>` : `<span class="muted">Ask a lead for work, for example with <span class="mono">hermes</span>.</span>`}</div>`;
-  if (!projects.length) { $("#flowProjects").innerHTML = ""; $("#flowGraph").innerHTML = `<p class="muted" style="margin:0">No tasks yet.</p>`; F.sig = ""; return; }
-  if ((follow && projects[0].running) || !projects.some(p => p.key === F.project)) F.project = projects[0].key;
-  const proj = projects.find(p => p.key === F.project);
+  const fixed = routeProject();
+  if (fixed != null && !projects.some(p => p.key === fixed)) projects.unshift({ key: fixed, name: projectName(fixed), tasks: [], direct: [], last: 0, running: 0 });
+  $("#flowFollow").checked = fixed == null && follow;
+  if (!projects.length) { $("#flowProjects").innerHTML = ""; $("#flowProject").hidden = $("#flowRequests").hidden = true; $("#flowNow").innerHTML = `<div class="line"><span class="dot"></span><b>No agent is working right now.</b></div>`; $("#flowGraph").innerHTML = `<p class="muted" style="margin:0">No tasks yet.</p>`; F.sig = ""; return; }
+  if (fixed != null) F.project = fixed;
+  else if ((follow && projects[0].running) || !projects.some(p => p.key === F.project)) F.project = projects[0].key;
+  const proj = projects.find(p => p.key === F.project), reg = P.list.find(p => p.folder === proj.key);
   $("#flowProjects").innerHTML = projects.slice(0, 8).map(p => `<button type="button" data-project="${esc(p.key)}" aria-pressed="${p.key === F.project}" title="${esc(p.key)}">${p.running ? "● " : ""}${esc(p.name)} <span class="muted">${p.tasks.length + p.direct.length}</span></button>`).join("");
-  $$("#flowProjects button").forEach(b => b.onclick = () => { F.project = b.dataset.project; $("#flowFollow").checked = false; F.sig = ""; renderFlow(F.data); });
+  $$("#flowProjects button").forEach(b => b.onclick = () => { F.sig = ""; location.hash = flowHref(b.dataset.project); });
+  renderProjectNav();
+
+  // The project this page is about: what it is for, how far it is, and the button to give it work.
+  const inProj = new Set(proj.tasks.map(t => t.id)), stuck = proj.tasks.filter(t => t.status === "blocked" || t.status === "triage");
+  const open = proj.tasks.filter(t => ["running", "ready", "todo", "review", "scheduled"].includes(t.status)).length, done = proj.tasks.filter(t => t.status === "done").length;
+  const spent = proj.tasks.reduce((n, t) => n + (t.usage?.cost || 0), 0) + proj.direct.reduce((n, x) => n + (x.usage?.cost || 0), 0);
+  $("#flowProject").hidden = false;
+  $("#flowProject").innerHTML = `<div class="row"><h2 class="grow" style="margin:0">${esc(proj.name)}</h2>${chip("", `${proj.tasks.length} task${proj.tasks.length === 1 ? "" : "s"}`)}${open ? chip("warn", `${open} open`) : ""}${done ? chip("ok", `${done} done`) : ""}${stuck.length ? chip("bad", `${stuck.length} blocked`) : ""}${spent ? chip("", `~$${spent.toFixed(spent < 1 ? 3 : 2)}`) : ""}
+      ${reg ? `<button class="btn primary" type="button" id="flowNewTask">New task</button>` : proj.key ? `<a class="btn" href="#/projects">Add as project</a>` : ""}</div>
+    <div class="muted mono" style="overflow-wrap:anywhere">${esc(proj.key || "tasks without a project folder")}</div>${reg?.goal ? `<p style="margin:6px 0 0"><b>Goal:</b> ${esc(reg.goal)}</p>` : ""}${reg?.note ? `<p class="muted" style="margin:4px 0 0">${esc(reg.note)}</p>` : ""}`;
+  if ($("#flowNewTask")) $("#flowNewTask").onclick = () => openProjectTask(reg);
+
+  const dw = directWorking(d).filter(x => projectKey(x.cwd) === proj.key), running = d.running.filter(r => inProj.has(r.task_id));
+  const elsewhere = (d.working ?? d.running.length) - dw.length - running.length;
+  $("#flowNow").innerHTML = (running.length || dw.length ? dw.map(x => `<div class="line"><span class="dot ok pulse"></span><span><b>${esc(x.role)}</b> is working with you on “${esc(directTitle(x))}”</span>
+      <span class="muted">${dur(x.seconds)} · ${esc(friendly(x.activity))} · ${tok(x.usage?.total)} tokens</span></div>`).join("") + running.map(r => `<div class="line"><span class="dot ok pulse"></span><span><b>${esc(r.profile)}</b> is working on “${esc(r.title)}”</span>
+      <span class="muted">${dur(r.seconds)} · ${esc(friendly(r.activity))} · ${tok(r.usage?.total)} tokens</span></div>`).join("")
+    : `<div class="line"><span class="dot"></span><b>No agent is working on this project right now.</b>${elsewhere > 0 ? `<span class="muted">${elsewhere} working on another project.</span>` : !stuck.length ? `<span class="muted">Give it work with “New task”, or run <span class="mono">hermes</span> in its folder.</span>` : ""}</div>`)
+    + stuck.slice(0, 4).map(t => `<div class="line nowrap"><span class="dot bad"></span><button type="button" class="stuck" data-stuck="${esc(t.id)}"><b>${esc(t.title)}</b> (${esc(t.assignee || "nobody")}): ${esc(t.status === "triage" ? "stopped after blocking twice for the same reason" : t.blocked_reason || "blocked")}</button></div>`).join("")
+    + (stuck.length > 4 ? `<div class="line muted">and ${stuck.length - 4} more blocked task${stuck.length - 4 === 1 ? "" : "s"} below</div>` : "");
+  $$("#flowNow [data-stuck]").forEach(b => b.onclick = () => openTask(b.dataset.stuck));
+
+  // Between departments: what one team's lead asked of another, and whether it was answered.
+  const deptOf = Object.fromEntries(d.agents.map(a => [a.profile, a.dept])), reqs = proj.tasks.filter(t => (t.title || "").startsWith(REQUEST));
+  $("#flowRequests").hidden = !proj.tasks.length;
+  $("#flowRequests").innerHTML = `<h2 style="margin:0">Between departments</h2>` + (reqs.length ? `<div class="reqs">${reqs.map(t => { const [k, text] = REQ_STATE[t.status] || ["", "waiting"];
+      return `<button type="button" data-req="${esc(t.id)}">${chip(k, text)}<span><b>${esc(t.created_by || "?")}</b> <span class="muted">(${esc(deptOf[t.created_by] || "?")})</span> → <b>${esc(t.assignee || "?")}</b> <span class="muted">(${esc(deptOf[t.assignee] || "?")})</span></span><span class="grow">${esc(t.title.slice(REQUEST.length).trim())}</span><span class="muted">${esc(when(t.completed_at || t.created_at))}</span></button>`; }).join("")}</div>`
+    : `<p class="muted" style="margin:6px 0 0">No requests between departments in this project yet. When a lead needs work or an answer from another team, it creates a <span class="mono">[request]</span> task for that team's lead, and it is listed here.</p>`);
+  $$("#flowRequests [data-req]").forEach(b => b.onclick = () => openTask(b.dataset.req));
 
   // Redraw the boxes only when something changed, so the flashing does not restart on every refresh.
   const state = {}; for (const t of proj.tasks) state[t.id] = [t.status, t.assignee, t.runs.length, (t.runs[t.runs.length - 1] || {}).status, t.blocked_reason].join("|");
@@ -858,8 +1218,10 @@ async function refreshFlow(quiet) {
   try { renderFlow(await api("/api/activity?range=today")); }
   catch (e) { if (!quiet) throw e; $("#flowUpdated").textContent = "update failed: " + e.message; }
 }
+$("#flowFollow").onchange = e => { if (e.target.checked && S.route.project != null) location.hash = "#/flow"; else if (F.data) renderFlow(F.data); };
 loaders.flow = async () => {
   F.sig = "";
+  try { const r = await api("/api/projects"); P.list = r.projects; } catch {}
   await refreshFlow();
   clearInterval(F.timer);
   F.timer = setInterval(() => { if (S.route.view !== "flow") { clearInterval(F.timer); F.timer = null; return; } if (!document.hidden && !$("#agentDialog").open) refreshFlow(true); }, 4000);
@@ -901,7 +1263,7 @@ function renderOffice(d) {
       <div class="floor">${agents.map(a => { const st = agentState(d, a);
         const cls = !a.installed || !a.enabled ? "off" : st.run ? "work" : st.failed ? "stuck" : "idle";
         const quiet = st.run?.activity_at ? d.now - st.run.activity_at : 0;
-        const bubble = st.run ? `<span class="bubble ${quiet > 120 ? "warn" : ""}">${esc(quiet > 120 ? "quiet " + dur(Math.round(quiet)) : friendly(st.run.activity))}</span>` : st.failed ? `<span class="bubble bad">${esc(CAUSE[st.failed.cause] || "stuck")}</span>` : !a.installed ? `<span class="bubble">not hired yet</span>` : !a.enabled ? `<span class="bubble">off duty</span>` : "";
+        const bubble = st.run ? `<span class="bubble ${quiet > 120 ? "warn" : ""}">${esc(quiet > 120 ? "quiet " + dur(Math.round(quiet)) : friendly(st.run.activity))}</span>` : st.failed ? `<span class="bubble bad">${esc(st.failed.cause ? causeNow(st.failed.cause) : "stuck")}</span>` : !a.installed ? `<span class="bubble">not hired yet</span>` : !a.enabled ? `<span class="bubble">off duty</span>` : "";
         return `<div class="desk ${cls}" role="button" tabindex="0" data-agent="${esc(a.profile)}" aria-label="${esc(a.role)}, ${st.run ? "working" : cls}">
           ${bubble}${person(a)}<span class="who">${iconFor(a)} ${esc(a.role)}</span><span class="model">${esc(shortModel(st.run?.model || a.model))}</span>
           <span class="stack">${st.run && st.run.task_id ? paper({ id: st.run.task_id, title: st.run.title, status: "running" }) : ""}${st.queue.slice(0, 6).map(t => paper(t)).join("")}</span></div>`; }).join("")}</div></div>`; }).join("");
@@ -939,12 +1301,13 @@ function fly(from, to, cls) {
     { duration: 1100, easing: "ease-in-out" }).onfinish = () => { el.remove(); O.flying--; };
   el.style.left = "0"; el.style.top = "0";
 }
-const AG = { profile: null, tab: "status", sid: "", job: null, poll: null, log: [] };
+const AG = { profile: null, tab: "live", sid: "", job: null, poll: null, log: [], feed: null };
 const remembered = (k, v) => { try { if (v === undefined) return localStorage.getItem(k) || ""; localStorage.setItem(k, v); } catch {} return v || ""; };
-function openAgent(profile, tab) {
+async function openAgent(profile, tab) {
   const a = O.data?.agents.find(x => x.profile === profile); if (!a) return;
+  await loadProjectList();
   if (AG.profile !== profile) { clearInterval(AG.poll); Object.assign(AG, { profile, sid: "", job: null, poll: null, log: [] }); }
-  AG.tab = tab || (AG.profile === profile && AG.tab) || "status";
+  AG.tab = tab || (AG.profile === profile && AG.tab) || "live";
   renderAgent();
   if (!$("#agentDialog").open) $("#agentDialog").showModal();
 }
@@ -953,9 +1316,9 @@ function renderAgent() {
   $("#agTitle").textContent = `${iconFor(a)} ${a.role}`;
   const can = a.installed && a.enabled, locked = a.role === "manager" || /lead$/.test(a.role);
   $("#agBody").innerHTML = `
-    <p class="row">${st.run ? chip("ok", "working now") : !a.installed ? chip("", "not applied to Hermes yet") : !a.enabled ? chip("", "disabled") : st.failed ? chip("bad", st.failed.cause ? "stopped: " + (CAUSE[st.failed.cause] || st.failed.cause) : "stuck on a task") : chip("", "idle")}${chip("", a.dept)}<span class="mono muted">${esc(a.model || "?")}</span>
+    <p class="row">${st.run ? chip("ok", "working now") : !a.installed ? chip("", "not applied to Hermes yet") : !a.enabled ? chip("", "disabled") : st.failed ? chip("bad", st.failed.cause ? "stopped: " + causeNow(st.failed.cause) : "stuck on a task") : chip("", "idle")}${chip("", a.dept)}<span class="mono muted">${esc(a.model || "?")}</span>
       <span class="grow"></span><label class="switch" title="${locked ? "This agent runs its department and cannot be switched off" : "A disabled agent gets no tasks and cannot be chatted with"}"><input type="checkbox" id="agEnabled" ${a.enabled ? "checked" : ""} ${locked ? "disabled" : ""}> <span>${a.enabled ? "Enabled" : "Disabled"}</span></label></p>
-    <div class="seg" role="tablist" style="margin-bottom:12px">${[["status", "Status"], ["chat", "Chat"], ["task", "Give task"]].map(([k, l]) => `<button role="tab" data-agtab="${k}" aria-pressed="${AG.tab === k}">${l}</button>`).join("")}</div>
+    <div class="seg" role="tablist" style="margin-bottom:12px">${[["live", "Live"], ["status", "Status"], ["chat", "Chat"], ["task", "Give task"]].map(([k, l]) => `<button role="tab" data-agtab="${k}" aria-pressed="${AG.tab === k}">${l}</button>`).join("")}</div>
     <div id="agPane"></div>`;
   $$("#agBody [data-agtab]").forEach(b => b.onclick = () => { AG.tab = b.dataset.agtab; renderAgent(); });
   $("#agEnabled").onchange = async e => {
@@ -965,7 +1328,9 @@ function renderAgent() {
     catch (err) { e.target.checked = !on; toast(err.message, true); }
   };
   const pane = $("#agPane");
-  if (AG.tab === "status") paneStatus(pane, d, a, st);
+  clearInterval(AG.feed?.timer); AG.feed = null;
+  if (AG.tab === "live") paneLive(pane, a);
+  else if (AG.tab === "status") paneStatus(pane, d, a, st);
   else if (!can) pane.innerHTML = `<p class="muted">${a.installed ? "This agent is disabled. Switch it on above to chat with it or give it a task." : "This agent has no Hermes profile yet. Apply its department first."}</p>`;
   else if (AG.tab === "chat") paneChat(pane, a);
   else paneTask(pane, a);
@@ -983,6 +1348,39 @@ function paneStatus(pane, d, a, st) {
     ${runs.length ? `<p><b>Recent work</b></p><table><thead><tr><th>Task</th><th>Result</th><th>When</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead><tbody>${runs.map(r => `<tr><td><a href="#" data-open-task="${esc(r.task.id)}">${esc(r.task.title)}</a></td><td class="${OUTCOME[r.outcome] || ""}">${esc(outText(r))}</td><td class="muted">${when(r.started_at)}</td><td class="num">${tok(r.usage?.total)}</td><td class="num">${cost(r.usage)}</td></tr>`).join("")}</tbody></table>` : ""}`;
   $$("#agPane [data-open-task]").forEach(b => b.onclick = e => { e.preventDefault(); openTask(b.dataset.openTask); });
 }
+// ---- live: everything one agent says and does, as it happens (messages, thinking, tool calls with their commands, results) ----
+function paneLive(pane, a) {
+  if (!a.installed) { pane.innerHTML = `<p class="muted">This agent has no Hermes profile yet, so there is nothing to show.</p>`; return; }
+  pane.innerHTML = `<p class="row" style="margin:0 0 8px"><span id="liveState"></span><span class="grow"></span><label class="row" style="gap:6px"><input type="checkbox" id="liveFollow" checked> Follow</label></p>
+    <div class="chatlog livelog" id="liveLog" aria-live="off"></div>`;
+  const feed = AG.feed = { profile: a.profile, last: 0, session: "", sessions: {}, busy: false, timer: null }, log = $("#liveLog");
+  const head = x => `<div class="runhead row"><b>${esc(x.title || (x.task_id ? x.task_id : "Direct session"))}</b>${x.task_id ? `<a href="#" class="mono" data-open-task="${esc(x.task_id)}">${esc(x.task_id)}</a>` : chip("", x.source === "kanban" ? "task" : "direct")}${x.cwd ? `<span class="muted">${esc(folderName(x.cwd))}</span>` : ""}<span class="mono muted">${esc(shortModel(x.model))}</span><span class="muted">${when(x.started_at)}</span></div>`;
+  const tick = async () => {
+    if (feed.busy || AG.feed !== feed) return;
+    feed.busy = true;
+    try {
+      const d = await api(`/api/agents/${enc(a.profile)}/feed?after=${feed.last}`);
+      if (AG.feed !== feed) return;
+      Object.assign(feed.sessions, d.sessions);
+      let html = "";
+      for (const m of d.messages) {
+        if (m.session_id !== feed.session) { feed.session = m.session_id; html += head(feed.sessions[m.session_id] || { id: m.session_id }); }
+        html += msgHtml(m, true).replace(/^<(div|details) class="/, `<$1 title="${esc(new Date(m.at * 1000).toLocaleTimeString())}" class="`);
+      }
+      if (!feed.last && !d.messages.length) html = `<p class="muted" style="margin:0">Nothing yet. As soon as ${esc(a.role)} gets a message or a task, it appears here.</p>`;
+      else if (html && !feed.last) log.innerHTML = "";
+      if (html) { log.insertAdjacentHTML("beforeend", html); if ($("#liveFollow").checked) log.scrollTop = log.scrollHeight; }
+      feed.last = d.last;
+      const cur = feed.sessions[feed.session];
+      $("#liveState").innerHTML = d.working ? `${chip("ok", "working now")} <span class="muted">updates every second</span>` : `${chip("", cur?.state === "open" ? "session open, waiting" : "idle")} <span class="muted">waiting for the next message</span>`;
+    } catch (e) { if (AG.feed === feed) $("#liveState").innerHTML = `<span class="bad">update failed: ${esc(e.message)}</span>`; }
+    finally { feed.busy = false; }
+  };
+  log.onclick = e => { const t = e.target.closest("[data-open-task]"); if (t) { e.preventDefault(); openTask(t.dataset.openTask); } };
+  log.onscroll = () => { if (log.scrollHeight - log.scrollTop - log.clientHeight > 60) $("#liveFollow").checked = false; };
+  tick();
+  feed.timer = setInterval(() => { if (AG.feed !== feed || !$("#agentDialog").open || !$("#liveLog")) { clearInterval(feed.timer); if (AG.feed === feed) AG.feed = null; return; } if (!document.hidden) tick(); }, 1000);
+}
 // ---- chat with one agent: it works directly, without the manager or the task board ----
 function chatLine() {
   const j = AG.job; if (!j || j.state !== "running") return "";
@@ -998,7 +1396,7 @@ function drawChat() {
 }
 async function paneChat(pane, a) {
   pane.innerHTML = `<div class="row" style="margin-bottom:8px"><select id="chatSession" style="width:auto;max-width:60%" aria-label="Conversation"><option value="">New conversation</option></select>
-      <input id="chatFolder" class="grow mono" placeholder="project folder (optional), e.g. ~/Projects/CallAgent" value="${esc(remembered("folder:" + a.profile))}" aria-label="Project folder"></div>
+      ${folderSelect('id="chatFolder" class="grow"', remembered("folder:" + a.profile))}</div>
     <div class="chatlog" id="chatLog" aria-live="polite"></div>
     <form class="chatform" id="chatForm" style="margin-top:8px"><textarea id="chatText" placeholder="Message ${esc(a.role)}…  (Enter to send, Shift+Enter for a new line)" required></textarea>
       <div class="row" style="margin-top:6px"><span class="muted grow">Uses ${esc(a.role)}'s own API key. Each message costs at least a few cents on expensive models.</span><button class="btn danger" type="button" id="chatStop" hidden>Stop</button><button class="btn primary" id="chatSend">Send</button></div></form>`;
@@ -1036,7 +1434,7 @@ function paneTask(pane, a) {
   pane.innerHTML = `<form id="taskForm"><p class="muted" style="margin-top:0">One task on the board, for ${esc(a.role)} only. The manager is not involved and nothing is split up. You can follow it in Office and Activity.</p>
     <p><label>Title<br><input name="title" required maxlength="160" placeholder="e.g. Fix the reconnect bug in signaling.js"></label></p>
     <p><label>What to do<br><textarea name="body" style="min-height:120px;font-family:inherit;font-size:14px" placeholder="Goal, files, what done looks like, how to test it"></textarea></label></p>
-    <p><label>Project folder (optional)<br><input name="folder" class="mono" placeholder="~/Projects/…" value="${esc(remembered("folder:" + a.profile))}"></label></p>
+    <p><label>Project<br>${folderSelect('name="folder"', remembered("folder:" + a.profile))}</label></p>
     <div class="row">${a.dept === "software" ? `<label class="switch"><input type="checkbox" name="review"> <span>Send to the reviewer when done</span></label>` : ""}
       <label class="row" style="gap:6px">Time limit <input name="timeout" type="number" min="5" max="240" value="45" style="width:80px"> min</label><span class="grow"></span><button class="btn primary">Give task</button></div></form>`;
   $("#taskForm").onsubmit = async e => {
@@ -1053,7 +1451,7 @@ function openTask(id) {
   const [kind, text] = STATUS[t.status] || ["", t.status];
   $("#agTitle").textContent = `📄 ${t.title}`;
   $("#agBody").innerHTML = `<p class="row">${chip(kind, text)}<span class="mono muted">${esc(t.id)}</span><span class="muted">assigned to ${esc(t.assignee || "nobody")}</span><span class="grow"></span><b>${tok(t.usage.total)} tokens · ${cost(t.usage)}</b></p>
-    ${t.blocked_reason ? `<p class="bad">Blocked: ${esc(t.blocked_reason)}</p>` : ""}
+    ${t.blocked_reason ? `<p class="bad">Blocked: ${esc(t.blocked_reason)}</p>` : ""}${retryButton(t)}
     <p class="muted">Created ${when(t.created_at)} by ${esc(t.created_by || "?")} · ${t.completed_at ? "finished " + when(t.completed_at) : "not finished"}</p>
     ${t.runs.length ? `<table><thead><tr><th>Agent</th><th>Model</th><th>Result</th><th>Took</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead><tbody>${t.runs.map(r => `<tr><td><a href="#" data-open-agent="${esc(r.profile)}">${esc(r.profile)}</a></td><td class="mono">${esc(shortModel(r.model))}</td><td class="${OUTCOME[r.outcome] || ""}">${esc(outText(r))}</td><td>${dur(r.seconds)}</td><td class="num">${tok(r.usage?.total)}</td><td class="num">${cost(r.usage)}</td></tr>`).join("")}</tbody></table>` : `<p class="muted">Nobody has started this yet.</p>`}
     ${t.summary ? `<p><b>Result</b></p><pre>${esc(t.summary)}</pre>` : ""}
@@ -1583,6 +1981,8 @@ $("#pingBtn").addEventListener("click", async () => {
 if (!location.hash) { let saved = ""; try { saved = localStorage.getItem("route") || ""; } catch {} history.replaceState(null, "", saved.startsWith("#/") ? saved : "#/overview"); }
 navigate();
 refreshPending().catch(() => {});
+loadMode();
+api("/api/projects").then(r => { P.list = r.projects; renderProjectNav(); }).catch(() => {});
 loadCompany().catch(e => toast(e.message, true));
 </script>
 </body>

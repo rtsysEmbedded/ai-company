@@ -16,6 +16,7 @@ import time
 import urllib.request
 
 import yaml
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
@@ -43,6 +44,7 @@ if not os.path.exists(TOKEN_FILE):
 TOKEN = open(TOKEN_FILE).read().strip()
 
 app = FastAPI(title="AI Company Control Panel", docs_url=None, redoc_url=None)
+app.add_middleware(GZipMiddleware, minimum_size=2000)   # the live pages fetch the whole activity snapshot every few seconds
 _jobs: dict = {}
 
 
@@ -64,7 +66,7 @@ def login(token: str):
     if not secrets.compare_digest(token, TOKEN):
         raise HTTPException(401, "wrong token")
     r = RedirectResponse("/", status_code=303)
-    r.set_cookie("panel_token", TOKEN, httponly=True, samesite="strict", max_age=30 * 86400)
+    r.set_cookie("panel_token", TOKEN, httponly=True, samesite="lax", max_age=30 * 86400)
     return r
 
 
@@ -94,7 +96,21 @@ def _software_apply(message: str):
     return r.returncode == 0, (r.stdout + r.stderr).strip() + "\n\nSaved as: " + git("log", "--oneline", "-1").stdout.strip()
 
 
-app.include_router(software_api.build_router(auth, _software_apply))   # first: /api/departments/software is not an engine department
+def _switch_mode(mode: str):
+    """Rewrite only the main agent's instructions for the new mode, and record the switch. Returns (ok, note)."""
+    other = [l for l in git("diff", "HEAD", "--", "team.yaml").stdout.splitlines()
+             if l[:1] in "+-" and not l.startswith(("+++", "---")) and not l[1:].startswith("mode:")]
+    cmd = [UV, "run", "--project", ROOT, "-q", "python", os.path.join(ROOT, "scripts", "apply_team.py"), "--only", "manager", "--soul-only"]
+    r = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT)
+    if r.returncode != 0 or "instructions updated" not in r.stdout:
+        return False, ((r.stderr or r.stdout).strip() or "the main agent's instructions were not updated")[-300:]
+    if not other:   # nothing else is waiting in team.yaml, so the switch is recorded on its own
+        git("add", "team.yaml")
+        git("-c", "user.name=AI Company Panel", "-c", "user.email=panel@localhost", "commit", "-qm", f"panel: switch to {mode} mode")
+    return True, "It applies to new sessions: in a running hermes, type /new or start it again."
+
+
+app.include_router(software_api.build_router(auth, _software_apply, mode_fn=_switch_mode))   # first: /api/departments/software is not an engine department
 app.include_router(dept_api.build_router(auth))
 
 import activity_api  # noqa: E402
@@ -108,6 +124,12 @@ app.include_router(agent_api.build_router(auth))
 import backup_api  # noqa: E402
 
 app.include_router(backup_api.build_router(auth))
+
+import budget_api  # noqa: E402
+import projects_api  # noqa: E402
+
+app.include_router(projects_api.build_router(auth))
+app.include_router(budget_api.build_router(auth))
 
 
 # ---------- helpers ----------

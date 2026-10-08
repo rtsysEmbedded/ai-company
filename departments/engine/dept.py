@@ -294,6 +294,119 @@ def names_in_use(except_department):
     return owners
 
 
+def software_lead():
+    """The software team's lead (team.yaml `routing: lead:`), or None when the manager leads that team itself."""
+    inside = False
+    for line in read_text(SOFTWARE_TEAM).splitlines():
+        if re.match(r"^routing:\s*$", line):
+            inside = True
+        elif inside and re.match(r"^\S", line):
+            inside = False
+        elif inside:
+            match = re.match(r"^  lead:\s*([\w-]+)", line)
+            if match:
+                return match.group(1) if match.group(1) in software_roles()[1:] else None
+    return None
+
+
+# --- the lead guard: a Hermes hook that keeps a lead from doing its specialists' work on a board task ---------
+GUARD_SCRIPT = os.path.join(ENGINE, "lead_guard.py")
+
+
+def guard_hook():
+    """The hooks.pre_tool_call entry for a lead's profile."""
+    python = os.environ.get("DEPT_PYTHON") or shutil.which("python3") or sys.executable
+    return {"matcher": ".*", "command": "%s %s" % (python, GUARD_SCRIPT), "timeout": 10}
+
+
+def guard_team(config):
+    """What the guard tells the lead when it refuses a step: who is in the team and which tools they have."""
+    lead = (config.get("routing") or {}).get("lead")
+    return {"lead": lead, "team": [{"name": n, "title": s.get("title") or n, "tools": tool_names(s)}
+                                   for n, s in config["roles"].items() if n != lead and s.get("enabled", True)]}
+
+
+def guard_installed(folder, team):
+    return (GUARD_SCRIPT in read_text(os.path.join(folder, "config.yaml"))
+            and read_json(os.path.join(folder, "lead_guard.json"), None) == team)
+
+
+# The last line of a task for a lead. A small model follows the task in front of it better than its long rules.
+LEAD_LINE = ("You are the lead for this job: do not do the work yourself and do not block it for a missing tool. Split it "
+             "into tasks for your specialists with kanban_create, then finish with kanban_complete and the plan.")
+
+
+REQUEST_TAG = "[request]"            # title prefix of a task from one team's lead to another's (the panel lists these)
+INTERFACES = "docs/interfaces.md"    # where teams write down what they agreed on, inside the project folder
+GOAL_TURNS = 6    # turns a specialist gets in Hermes' goal loop before its task is blocked (lead_guard.py checks the same number)
+GOAL_FIELD = ("- `goal_mode: true` and `goal_max_turns: %d` on every task for a specialist. With it a specialist that stops "
+              "early is told to go on and to close the task; without it the whole run is repeated." % GOAL_TURNS)
+BLOCK_LINE = ("If you cannot go on (missing information, a missing tool, a decision that is not yours), use `kanban_block` "
+              "with `kind: needs_input` and one precise question or the exact thing that is missing.")
+
+
+def closing_rules(lead):
+    """What a lead does after handing out the work: check the result, report, and deal with a blocked specialist."""
+    return ["",
+            "# Close the loop: check and report",
+            "Handing out the work is not the end of the job. The last task you create for every job is one for yourself: "
+            "`title` ends with `check and report`, `assignee` is **%s**, `parents` are ALL the tasks you just created, same "
+            "`workspace_path`, no `goal_mode`. Its `body` repeats the user's request and lists the acceptance criteria of "
+            "each task. The board starts it by itself when the others are finished." % lead,
+            "When that task runs: read the handoffs of its parents and look at the files they name. Compare with the "
+            "acceptance criteria. If everything is there, finish with `kanban_complete` and a report for the user: what "
+            "was done, where the files are, what is still open. If something is missing or wrong, create a task for the "
+            "specialist who fixes it (say exactly what is wrong) and a new `check and report` task after it, then complete.",
+            "",
+            "# When a specialist is blocked",
+            "A blocked task of your team comes to you as a task whose title starts with `[blocked]`. It contains the "
+            "specialist's reason. Decide, then finish with `kanban_complete`:",
+            "- You know the answer: write it as your result. It is given to the specialist and the task starts again.",
+            "- Another member of your team should do it: create that task (full body, same `workspace_path`). The blocked "
+            "task is closed and the tasks that waited for it wait for the new one.",
+            "- Another team has to help: create a `[request]` task for that team's lead (see Other teams), then answer as above.",
+            "- Only the user can decide: use `kanban_block` with `kind: needs_input` and the question."]
+
+
+def other_teams(own_lead):
+    """The teams a lead can work with: [{title, lead}] for every team but the lead's own whose lead has a Hermes profile."""
+    teams = [{"title": "Software", "lead": software_lead()}]
+    for name in list_departments():
+        config = read_json(config_path(name), {}) or {}
+        lead = (config.get("routing") or {}).get("lead")
+        if ((config.get("roles") or {}).get(lead) or {}).get("enabled", True):
+            teams.append({"title": config.get("name") or name, "lead": lead})
+    return [t for t in teams if t["lead"] and t["lead"] != own_lead and os.path.isdir(profile_dir(t["lead"]))]
+
+
+def cross_team_rules(own_lead):
+    """How a lead works with the leads of the other teams. Empty when there is no other team."""
+    teams = other_teams(own_lead)
+    if not teams:
+        return []
+    return ["", "# Other teams",
+            "Work that belongs to another team is not yours, even when you have the tools for it. Do not do it yourself "
+            "and do not give it to your own specialists. Everything between teams goes from lead to lead, as a request:"] + [
+            "- **%s** leads %s." % (t["lead"], t["title"]) for t in teams] + [
+            "A request is ONE task made with `kanban_create` for that lead. It is the only way to reach another team: a "
+            "comment wakes nobody. `title` starts with `%s` and names the project; `assignee` is the lead's name exactly "
+            "as written; `workspace_kind: dir` + `workspace_path` is the same project folder; no `goal_mode`." % REQUEST_TAG,
+            "- You need work from them: `body` says what you need and why, the interface between your work and theirs "
+            "(connector and pinout, protocol, register map, API, file format) and every decision already taken. Say what "
+            "is needed, not how to do it. Do not add a review line; that team reviews its own work. End the body with "
+            "this line, word for word: \"%s\"" % LEAD_LINE,
+            "- You need an answer from them: `body` is the question, what you already know and what depends on the answer. "
+            "End the body with: \"Answer this yourself with kanban_complete; the answer is your result.\"",
+            "Put the request's id in `parents` of your own tasks that need the result, and of your `check and report` "
+            "task. They wait for it, and the other lead's result is handed to them automatically.",
+            "A request that another lead gives you: a question you answer yourself with `kanban_complete`, at once; work "
+            "you plan like a job from the user.",
+            "Agree on a shared interface before either team builds on it. The team that owns the interface writes it into "
+            "`%s` in the project folder; every task on either side of it names that file." % INTERFACES,
+            "Your specialists never write to another team. When one of them needs something from another team it blocks, "
+            "and you send the request."]
+
+
 def validate(name, config, models=None):
     """Return (errors, warnings). `models` is the OpenRouter list (id -> info) when available."""
     errors, warnings = [], []
@@ -476,14 +589,53 @@ def test_model(model_id, key):
 
 
 # --- the text each agent gets ---------------------------------------------------
+def tool_names(spec):
+    """A role's own tools in words, without the task board: 'kicad, freecad' or 'no special tools'."""
+    return ", ".join(t for t in spec.get("tools") or [] if t != "kanban") or "no special tools"
+
+
+def tools_rules(role, config):
+    """Which tools the role has and how to reach them. Without this an agent guesses a tool's name, fails and gives up."""
+    spec, registry, lead = config["roles"][role], tool_registry(), (config.get("routing") or {}).get("lead")
+    lines = ["# Your tools"]
+    for tool in spec.get("tools") or []:
+        info = registry.get(tool) or {}
+        label = info.get("label") or tool
+        if info.get("kind") == "mcp":
+            lines.append("- **%s** (%s): its tools are named `mcp__%s__...`%s." % (
+                tool, label, tool, "; read the `%s` skill with `skill_view` before the first use" % tool if info.get("skill") else ""))
+        elif info.get("kind") == "skill":
+            lines.append("- **%s** (%s): a skill, read it with `skill_view`." % (tool, label))
+        else:
+            lines.append("- **%s** (%s)." % (tool, label))
+    if len(lines) == 1:
+        lines.append("You have the general tools (files, terminal, web) and no special tools of this department.")
+    first = next((t for t in spec.get("tools") or [] if (registry.get(t) or {}).get("kind") == "mcp"), None)
+    lines.append("A tool that is not in your tool list yet is loaded on demand: find it with `tool_search`%s and run it "
+                 "with `tool_call`. Never decide that a tool is missing because a name you guessed did not work; search "
+                 "first." % (" (search for the prefix, for example `mcp__%s__`)" % first if first else ""))
+    if role == lead:
+        lines.append("Your own special tools are for looking at a project so you can plan it, not for doing a specialist's "
+                     "work. A tool you do not have, or one that fails, is never a reason to block a task: give that work "
+                     "to the team member who has the tool (their tools are listed under Your team). Block only when "
+                     "nobody in your team and no other team can do it, and then name exactly what is missing.")
+    else:
+        lines.append("If the task needs a special tool that is not listed here, do not improvise and do not report the work "
+                     "as done: use `kanban_block` with `kind: needs_input`, name the tool and what it is needed for, and your lead **%s** gives the "
+                     "work to a role that has it." % lead)
+    return "\n".join(lines)
+
+
 def routing_rules(role, config):
     roles, routing = config["roles"], config.get("routing") or {}
     lead, reviewer, review = routing.get("lead"), routing.get("reviewer"), routing.get("review", "changes")
     timeout = seconds(routing.get("task_timeout", "60m"))
     enabled = {n: s for n, s in roles.items() if s.get("enabled", True)}
     if role == lead:
-        roster = "\n".join("- **%s** (%s): %s" % (n, s["title"], s["description"].strip()) for n, s in enabled.items() if n != lead)
+        roster = "\n".join("- **%s** (%s; tools: %s): %s" % (n, s["title"], tool_names(s), s["description"].strip())
+                           for n, s in enabled.items() if n != lead)
         tag = str(config.get("task_tag") or "").strip()
+        cross = cross_team_rules(lead)
         lines = [
             "# Your team (give each task to the best fit)", roster, "",
             "# How you work: plan, delegate, verify",
@@ -491,18 +643,33 @@ def routing_rules(role, config):
             "on the kanban board with `kanban_create`:",
             ("- `title`: start with `[%s] <project>:` so this department's tasks are easy to find." % tag) if tag else
             "- `title`: start with the project name.",
-            "- `assignee`: one of the names above, exactly as written. A task given to any other name is never picked up.",
+            "- `assignee`: one of the names above, exactly as written. A task given to any other name is never picked up"
+            + (" (the only exception is another team's lead, see Other teams)." if cross else "."),
             "- `body`: the goal, the input files, every decision the task depends on, acceptance criteria that can be "
             "checked, and how to verify. The worker sees only this body and its parents' handoffs.",
             "- `workspace_kind: dir` and `workspace_path`: the absolute project folder, so everyone works on the same files.",
             "- `parents`: ids of the tasks that must finish first.",
             "- `max_runtime_seconds: %d` on every task." % timeout,
+            GOAL_FIELD,
         ]
         if review != "off":
             scope = "every task" if review == "all" else "every task that produces or changes %s" % (routing.get("review_scope") or "a deliverable")
             lines.append('- For %s, end the body with: "When done, call kanban_request_review with reviewer=%s."' % (scope, reviewer))
         lines.append("After creating the tasks, tell the user the plan (task ids, who does what, in which order). Use "
                      "`kanban_list` and `kanban_show` to report progress when asked. Answer simple questions yourself, without the board.")
+        lines += closing_rules(lead)
+        lines += ["",
+                  "# When a task on the board is assigned to you",
+                  "A board task for you is the same request as in a chat: plan and delegate. Do not do the specialist work "
+                  "yourself, and do not stop after writing the plan. Create the tasks for your team with `kanban_create` as "
+                  "described above, then finish with `kanban_complete` and the plan (task ids, who does what, in which order). "
+                  "If something that changes the plan is unclear, use `kanban_block` with one precise question; the user's "
+                  "answer arrives as a comment on the task. Never end a run without `kanban_complete` or `kanban_block`.",
+                  "On a board task you only read, plan and hand out. Read what you need to split the work, nothing more: "
+                  "do not run commands, do not measure, export, check or prepare files for the specialists. Finding the "
+                  "starting state is the first step of the specialist's own task; write it into the task body as a step. "
+                  "Your work tools are switched off on board tasks, and a task cannot be completed before your team has work."]
+        lines += cross
         return "\n".join(lines)
     lines = ["# Working on kanban tasks",
              "When you run as a kanban worker, stay inside the task's workspace and scope. Read the task body and the "
@@ -515,7 +682,11 @@ def routing_rules(role, config):
                      "handoff. Otherwise finish with `kanban_complete` and your handoff." % reviewer)
     else:
         lines.append("Finish with `kanban_complete` and your handoff.")
-    lines.append("If you are blocked by missing information, use `kanban_block` with one precise question.")
+    lines.append(BLOCK_LINE + " Your lead **%s** gets it and answers or gives the work to someone else." % lead)
+    lines.append("Never end a run without `kanban_complete`, `kanban_request_review` or `kanban_block`: a run that just "
+                 "stops counts as a crash and is repeated from the start.")
+    lines.append("You do not write to other teams. If you need something from another team, block and say what you need; "
+                 "your lead sends the request.")
     return "\n".join(lines)
 
 
@@ -532,6 +703,7 @@ def soul_block(department, role, config):
         if text:
             parts.append(text.replace("{projects_dir}", projects))
     parts.append(routing_rules(role, config))
+    parts.append(tools_rules(role, config))
     registry = tool_registry()
     parts.extend(registry[t]["rules"] for t in spec.get("tools") or [] if (registry.get(t) or {}).get("rules"))
     return "\n\n".join(parts)
@@ -615,6 +787,8 @@ def role_differences(department, role, config, env=None):
             diffs.append("%s skill missing" % tool)
     if "kanban" in tools and not actual["kanban"]:
         diffs.append("task board tools not enabled")
+    if role == (config.get("routing") or {}).get("lead") and not guard_installed(profile_dir(role), guard_team(config)):
+        diffs.append("lead guard not installed")
     if actual["soul_hash"] != hashlib.sha1(soul_block(department, role, config).encode("utf-8")).hexdigest():
         diffs.append("role rules out of date")
     wanted_key = key_for(role, department, env)
@@ -720,8 +894,15 @@ def apply(department, config, only=None, dry_run=False, log=print):
         hermes(p + ["config", "set", "agent.reasoning_effort", spec.get("effort", "medium")], what="set effort")
         fallback = [{"provider": provider, "model": spec["fallback"]}] if spec.get("fallback") else []
         hermes(p + ["config", "set", "fallback_providers", json.dumps(fallback)], what="set fallback")
+        # A model that repeats the same failing tool call is stopped; on its own it can go on for hundreds of calls.
+        hermes(p + ["config", "set", "tool_loop_guardrails.hard_stop_enabled", "true"], what="set the loop stop")
         if "kanban" in tools:
             hermes(p + ["tools", "enable", "kanban"], what="enable task board tools")
+        if role == (config.get("routing") or {}).get("lead"):
+            hermes(p + ["config", "set", "hooks.pre_tool_call", json.dumps([guard_hook()])], what="install the lead guard")
+            hermes(p + ["config", "set", "hooks_auto_accept", "true"], what="accept the lead guard")
+            with open(os.path.join(profile_dir(role), "lead_guard.json"), "w", encoding="utf-8") as handle:
+                json.dump(guard_team(config), handle, indent=1)
         actual = actual_state(role)
         for tool, present in actual["mcp"].items():
             tool_spec, wanted = registry[tool], tool in tools
