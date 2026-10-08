@@ -165,7 +165,7 @@ def main():
         check("Hermes itself reports the lead's model, fallback and effort",
               hermes("-p", "hw-lead", "config", "get", "model.default").strip() == config["roles"]["hw-lead"]["model"]
               and config["roles"]["hw-lead"]["fallback"] in hermes("-p", "hw-lead", "config", "get", "fallback_providers")
-              and hermes("-p", "hw-lead", "config", "get", "agent.reasoning_effort").strip() == "high")
+              and hermes("-p", "hw-lead", "config", "get", "agent.reasoning_effort").strip() == config["roles"]["hw-lead"].get("effort", "medium"))
         check("Hermes lists the KiCad tools on the layout profile and none on the researcher",
               "kicad" in hermes("-p", "hw-layout", "mcp", "list") and "kicad" not in hermes("-p", "hw-research", "mcp", "list"))
         check("the lead has the task-board toolset and still has file and terminal tools",
@@ -173,22 +173,23 @@ def main():
         check("Hermes lists the kicad skill on the schematic profile", "kicad" in hermes("-p", "hw-schematic", "skills", "list"))
         soul = open(profile("hw-layout", "SOUL.md")).read()
         check("role rules are in SOUL.md: shared rules, role rules and the reviewer's name",
-              all(text in soul for text in ("Hardware department rules", "# Role: PCB layout engineer", "reviewer=hw-review", engine.BEGIN, engine.END)))
+              all(text in soul for text in ("Hardware department rules", "# Role: PCB layout engineer", "reviewer: hw-review", engine.BEGIN, engine.END)))
         lead_soul = open(profile("hw-lead", "SOUL.md")).read()
         check("the lead's rules list the other 7 roles, the task tag and how to delegate",
               all("**%s**" % r in lead_soul for r in config["roles"] if r != "hw-lead") and "kanban_create" in lead_soul
               and "`[hw] <project>:`" in lead_soul and "max_runtime_seconds: 3600" in lead_soul
-              and "produces or changes a design (schematic, board, CAD part, firmware)" in lead_soul)
+              and "Do not write a review instruction into a body" in lead_soul and "check and report" in lead_soul
+              and "produced or changed a design (schematic, board, CAD part, firmware)" in soul)
         check("the projects folder is written as an absolute path", os.path.expanduser("~/Hardware_Projects") in soul and "{projects_dir}" not in soul)
         log = []
         engine.apply("hardware", config, log=log.append)
-        check("a second apply changes nothing", sum("already in sync" in line for line in log) == 8, log)
+        check("a second apply changes nothing", sum("already in sync" in line for line in log) == len(config["roles"]), log)
 
         print("Changing the configuration")
         with open(profile("hw-layout", "SOUL.md"), "w") as handle:
             handle.write("MY OWN NOTE.\n\n<!-- hardware-dept:begin (old) -->\nold generated text\n<!-- hardware-dept:end -->\n")
         config["roles"]["hw-layout"].update(model="test/text-only", tools=[])
-        config["roles"]["hw-firmware"]["enabled"] = False
+        config["roles"]["hw-mech"]["enabled"] = False
         config["routing"]["task_timeout"] = "30m"
         engine.save_config("hardware", config)
         differences = engine.status("hardware", config)["roles"]["hw-layout"]["differences"]
@@ -201,7 +202,7 @@ def main():
         check("text the user wrote in SOUL.md survives; a block from the earlier stand-alone version is replaced",
               "MY OWN NOTE" in new_soul and "old generated text" not in new_soul and new_soul.count(engine.BEGIN) == 1)
         check("the lead's rules follow the new time limit", "max_runtime_seconds: 1800" in open(profile("hw-lead", "SOUL.md")).read())
-        check("a disabled role is skipped, not deleted", any("hw-firmware: disabled" in line for line in log) and os.path.isdir(profile("hw-firmware")))
+        check("a disabled role is skipped, not deleted", any("hw-mech: disabled" in line for line in log) and os.path.isdir(profile("hw-mech")))
 
         print("A second department")
         engine.new_department("research", "Research", "rs")
@@ -225,8 +226,12 @@ def main():
         rs_soul = open(profile("rs-lead", "SOUL.md")).read()
         check("its rules come from its own files, not from hardware's",
               "Research department rules" in rs_soul and "Hardware department rules" not in rs_soul and "**rs-specialist**" in rs_soul and "`[rs] <project>:`" in rs_soul)
-        check("the hardware department is unaffected", engine.status("hardware", config)["in_sync"])
-        check("the overview lists both departments", [(d["name"], d["enabled"], d["in_sync"]) for d in engine.overview()] == [("hardware", 7, True), ("research", 3, True)], engine.overview())
+        # A new department means a new lead to work with: only the hardware lead's rules (its "Other teams") are out of date.
+        changed = {r: v["differences"] for r, v in engine.status("hardware", config)["roles"].items() if v["differences"]}
+        check("only the hardware lead learns about the new team", changed == {"hw-lead": ["role rules out of date"]}, changed)
+        check("after an apply the hardware lead knows the new lead", engine.apply("hardware", config, log=quiet) and engine.status("hardware", config)["in_sync"]
+              and "**rs-lead** leads Research" in open(profile("hw-lead", "SOUL.md")).read())
+        check("the overview lists both departments", [(d["name"], d["enabled"], d["in_sync"]) for d in engine.overview()] == [("hardware", len(config["roles"]) - 1, True), ("research", 3, True)], engine.overview())
 
         print("API keys")
         check("without a key, status reports that no role has one", not any(r["has_key"] for r in engine.status("hardware", config)["roles"].values()))
@@ -284,7 +289,7 @@ def main():
         check("the software panel link logs in with that panel's own token", code == 303 and answer["location"].endswith("/login?token=software-panel-token"), answer)
         code, state = call("/api/state?dept=hardware", headers=get)
         check("a department's state is served, and never contains a key",
-              code == 200 and len(state["config"]["roles"]) == 8 and "good-key" not in json.dumps(state) and state["status"]["key"]["shared"] is True)
+              code == 200 and len(state["config"]["roles"]) == len(config["roles"]) and "good-key" not in json.dumps(state) and state["status"]["key"]["shared"] is True)
         check("an unknown department is a clean error", call("/api/state?dept=../etc", headers=get)[0] == 400 and call("/api/state?dept=nope", headers=get)[0] == 400)
         code, listing = call("/api/models?dept=hardware", headers=get)
         check("the model list offers only tool-capable models, with the department's benchmarks",

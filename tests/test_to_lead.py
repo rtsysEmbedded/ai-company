@@ -98,6 +98,23 @@ def main():
     check("the lead's answer is written onto the task and it starts again",
           BOARD["t_sch"]["task"]["status"] == "ready" and said and "Use 12 V." in said[0]["body"], str(BOARD["t_sch"]["comments"]))
 
+    # A goal-loop task is judged on its text alone: the answer goes into the text of a continuation.
+    task("t_goal", assignee="hw-docs", title="write the limit", body="Write the limit.", created_by="panel")
+    BOARD["t_goal"]["events"].append({"kind": "created", "created_at": CLOCK[0], "payload": {"goal_mode": True}})
+    BOARD["t_goal"]["children"], BOARD["t_goal"]["parents"] = ["t_check"], ["t_before"]
+    block("t_goal", "Which current?")
+    run()
+    finish([d["task"]["id"] for d in BOARD.values() if d["task"]["title"] == "[blocked] write the limit"][-1], "2 A.")
+    before = len(CALLS)
+    run()
+    made = [c for c in CALLS[before:] if c[0] == "create"]
+    check("an answered goal-loop task continues as a new task with the answer in its text",
+          len(made) == 1 and "ANSWER from your lead hw-lead" in made[0][made[0].index("--body") + 1] and "2 A." in made[0][made[0].index("--body") + 1]
+          and "Write the limit." in made[0][made[0].index("--body") + 1] and "--goal" in made[0] and made[0][made[0].index("--parent") + 1] == "t_before", str(made))
+    new_id = [d["task"]["id"] for d in BOARD.values() if d["task"]["title"] == "write the limit"][-1]
+    check("the old task is archived and what waited for it waits for the new one",
+          BOARD["t_goal"]["task"]["status"] == "archived" and ["link", new_id, "t_check"] in CALLS[before:] and ["unlink", "t_goal", "t_check"] in CALLS[before:])
+
     block("t_sch", "No tool for wires.")
     run()
     ask2 = [d["task"]["id"] for d in BOARD.values() if d["task"]["title"].startswith("[blocked]")][-1]

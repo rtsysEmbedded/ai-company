@@ -25,6 +25,7 @@ import activity_api
 import budget_api
 import causes
 import projects_api
+import reissue
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 TEAM = os.path.join(ROOT, "team.yaml")
@@ -431,6 +432,19 @@ def build_router(auth) -> APIRouter:
             raise HTTPException(400, "write an answer first")
         assignee = _blocked_task(task_id)["assignee"]
         _kanban("comment", task_id, "--author", "user", "--", text)
+        # A goal-loop task is judged on its text alone: the answer goes into the text of a continuation task.
+        r = subprocess.run(["hermes", "kanban", "show", task_id, "--json"], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        try:
+            detail = json.loads(r.stdout or "{}")
+        except ValueError:
+            detail = {}
+        if reissue.is_goal_task(detail):
+            def run(*args, check=True):
+                out = subprocess.run(["hermes", "kanban", *args], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+                return out.stdout
+            new = reissue.with_answer(run, detail, "the user", text)
+            if new:
+                return {"task_id": new, "assignee": assignee, "continued_from": task_id}
         _kanban("unblock", task_id)
         return {"task_id": task_id, "assignee": assignee}
 

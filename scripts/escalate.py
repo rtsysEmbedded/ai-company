@@ -31,6 +31,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "services", "panel"))
 import budget_api  # noqa: E402  (monthly budget per agent)
 import causes  # noqa: E402  (reads Hermes' worker logs for the real failure reason)
+import reissue  # noqa: E402  (continues an answered goal-loop task with the answer in its text)
 
 FAILED = {"crashed", "timed_out", "spawn_failed", "gave_up", "stale", "changes_requested"}
 MARK = "[ai-company escalated]"
@@ -116,7 +117,7 @@ def to_lead(team, dry_run, since=None):
         open_ask = sent[-1] if sent and sent[-1][0] >= at else None
 
         if not open_ask:   # 1) a new block: ask the lead
-            if len(answered) >= MAX_ANSWERS:
+            if len(answered) >= MAX_ANSWERS or (task_body := (detail.get("task") or {}).get("body") or "").count("\nANSWER from ") >= MAX_ANSWERS:
                 continue
             print(f"to lead {t['id']} '{t.get('title')}' ({t.get('assignee')}) -> {lead}: {reason[:120]}")
             if dry_run:
@@ -165,8 +166,12 @@ def to_lead(team, dry_run, since=None):
             print(f"answered {t['id']} by {lead}: {answer[:120]}")
             if dry_run:
                 continue
-            kanban("comment", t["id"], "--author", lead, "--", f"Answer from your lead {lead}: {answer or '(no text; read the project folder)'}")
+            answer = answer or "(no text; read the project folder)"
+            kanban("comment", t["id"], "--author", lead, "--", f"Answer from your lead {lead}: {answer}")
             kanban("comment", t["id"], f"{ANSWERED} {ask_id}")
+            # A goal-loop task is judged on its text alone, so the answer must be in the text: continue it as a new task.
+            if reissue.is_goal_task(detail) and reissue.with_answer(kanban, detail, f"your lead {lead}", answer, reason):
+                continue
             kanban("unblock", t["id"], "--reason", f"answered by {lead}", check=False)
 
 

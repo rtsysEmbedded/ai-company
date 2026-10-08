@@ -7,7 +7,6 @@
     "hw-schematic": {"model": "anthropic/claude-sonnet-5.5", "fallback": "x-ai/grok-4.7", "effort": "high"},
     "hw-layout": {"model": "x-ai/grok-4.7", "fallback": "anthropic/claude-sonnet-5.5", "effort": "high"},
     "hw-mech": {"model": "anthropic/claude-sonnet-5.5", "fallback": "openai/gpt-6.1-sol", "effort": "high"},
-    "hw-firmware": {"model": "z-ai/glm-5.3", "fallback": "anthropic/claude-sonnet-5.5", "effort": "high"},
     "hw-review": {"model": "openai/gpt-6.1-sol", "fallback": "anthropic/claude-opus-5.5", "effort": "high"},
     "hw-docs": {"model": "deepseek/deepseek-v4.1-flash", "fallback": "google/gemini-3.8-flash", "effort": "low"}
   }

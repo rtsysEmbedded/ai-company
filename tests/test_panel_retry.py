@@ -105,7 +105,7 @@ def main():
         r = c.post("/api/tasks/t_aaaa1111/answer", json={"text": "--use 12 V"})
         check("answers a blocked task", r.status_code == 200, r.text)
         check("answer is a comment by the user, then unblock",
-              calls[before:] == [["hermes", "kanban", "comment", "t_aaaa1111", "--author", "user", "--", "--use 12 V"],
+              [c for c in calls[before:] if c[2] != "show"] == [["hermes", "kanban", "comment", "t_aaaa1111", "--author", "user", "--", "--use 12 V"],
                                  ["hermes", "kanban", "unblock", "t_aaaa1111"]], str(calls[before:]))
 
         check("conversation needs the token", anonymous.get("/api/tasks/t_aaaa1111/conversation").status_code == 401)
