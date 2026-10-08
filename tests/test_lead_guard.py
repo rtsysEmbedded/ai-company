@@ -43,10 +43,10 @@ def main():
     now = int(time.time())
     con = sqlite3.connect(DB)
     con.execute("CREATE TABLE tasks (id TEXT, created_by TEXT, created_at INTEGER, started_at INTEGER, title TEXT)")
-    con.execute("CREATE TABLE task_runs (id INTEGER, task_id TEXT, started_at INTEGER)")
+    con.execute("CREATE TABLE task_runs (id INTEGER, task_id TEXT, started_at INTEGER, worker_pid INTEGER, ended_at INTEGER)")
     con.execute("INSERT INTO tasks VALUES ('t_lead01', 'worker', ?, ?, 'job')", (now - 100, now - 60))
     con.execute("INSERT INTO tasks VALUES ('t_old', 'hw-lead', ?, NULL, 'old')", (now - 5000,))      # from an earlier run
-    con.execute("INSERT INTO task_runs VALUES (7, 't_lead01', ?)", (now - 60,))
+    con.execute("INSERT INTO task_runs VALUES (7, 't_lead01', ?, NULL, NULL)", (now - 60,))
     con.commit()
     with open(os.path.join(HOME, "lead_guard.json"), "w") as handle:
         json.dump({"lead": "hw-lead", "team": [{"name": "hw-schematic", "title": "Schematic engineer", "tools": "kicad"},
@@ -78,6 +78,11 @@ def main():
     check("handing out and asking are always allowed", not guard("kanban_create", {"title": "x", "assignee": "hw-schematic", "goal_mode": True, "goal_max_turns": 6})[0]
           and not guard("kanban_comment", {"task_id": "t_x", "body": "?"})[0] and not guard("kanban_block", {"reason": "which motor?", "kind": "needs_input"})[0])
 
+    blocked, reason = guard("kanban_complete", {"created_cards": ["t_1"], "summary_ui": "planned"})
+    check("a misspelled field name is refused with the right name", blocked and "`summary` instead of `summary_ui`" in reason, reason)
+    blocked, reason = guard("kanban_create", {"title": "x", "assignee": "sw-lead", "body_html": "..", "parents_string": ["t_1"]}, task=None)
+    check("also when creating a task, in a chat too", blocked and "`body` instead of `body_html`" in reason and "`parents` instead of `parents_string`" in reason, reason)
+    check("real field names pass", not guard("kanban_create", {"title": "x", "assignee": "sw-lead", "workspace_path": "/p", "max_runtime_seconds": 60})[0])
     blocked, reason = guard("kanban_block", {"reason": "no KiCad tool", "kind": "capability"})
     check("a missing tool is refused as a reason to block, once", blocked and "give the work to the specialist" in reason
           and not guard("kanban_block", {"reason": "nobody can", "kind": "capability"})[0], reason)
@@ -86,7 +91,7 @@ def main():
     check("a second complete is accepted (a job that needs no specialist)", not guard("kanban_complete", {"summary": "answered"})[0])
     con.execute("INSERT INTO tasks VALUES ('t_child', 'hw-lead', ?, NULL, 'child')", (now,))
     con.execute("INSERT INTO tasks VALUES ('t_check', 'hw-lead', ?, ?, 'check and report')", (now - 4000, now - 10))   # the lead's own closing task
-    con.execute("INSERT INTO task_runs VALUES (9, 't_check', ?)", (now + 100,))                     # nothing created in this run
+    con.execute("INSERT INTO task_runs VALUES (9, 't_check', ?, NULL, NULL)", (now + 100,))                     # nothing created in this run
     con.commit()
     con.execute("INSERT INTO tasks VALUES ('t_req', 'sw-lead', ?, ?, '[request] car: which UART pins?')", (now - 50, now - 10))
     con.commit()
@@ -94,6 +99,16 @@ def main():
     check("the lead's own check-and-report task completes without handing out work", not guard("kanban_complete", {"summary": "report"}, task="t_check", run="9")[0])
     con.close()
     check("after handing out work the task completes at once", not guard("kanban_complete", {"summary": "plan"}, run="8")[0])
+    # Hermes strips HERMES_KANBAN_TASK from a hook's environment: the task is found through the worker's pid.
+    con = sqlite3.connect(DB)
+    con.execute("INSERT INTO task_runs VALUES (11, 't_lead01', ?, ?, NULL)", (now, os.getpid()))
+    con.commit(); con.close()
+    blocked, reason = guard("terminal", {"command": "ls"}, task=None)
+    check("without the variable the board task is found through the worker's pid", blocked and "switched off" in reason, reason)
+    con = sqlite3.connect(DB)
+    con.execute("UPDATE task_runs SET ended_at = ? WHERE id = 11", (now,))
+    con.commit(); con.close()
+    check("once that run has ended it is a chat again", not guard("terminal", {"command": "ls"}, task=None)[0])
     os.remove(os.path.join(HOME, "lead_guard.json"))
     check("without its team file the guard allows everything", not guard("terminal", {"command": "ls"})[0])
 

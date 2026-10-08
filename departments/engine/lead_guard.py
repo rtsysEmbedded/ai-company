@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Lead guard: a Hermes pre_tool_call hook that keeps a team lead from doing the specialists' work.
 
-It mainly acts while the lead runs a task from the board (HERMES_KANBAN_TASK is set); in a chat with the
+It mainly acts while the lead runs a task from the board (found through the run's worker pid); in a chat with the
 user the lead keeps all its tools, and only the tasks it creates for specialists are checked (goal loop on). On a board task the lead may read, plan and hand out tasks. It may not
 run commands, change files other than its notes, or use a department tool that produces work, and it
 cannot finish a task without having given work to its team. Every refusal tells it whom to give the work to.
@@ -13,6 +13,7 @@ import json
 import os
 import re
 import sqlite3
+import subprocess
 import sys
 import tempfile
 from urllib.parse import quote
@@ -61,6 +62,51 @@ def created_tasks(profile, task_id, run_id):
         return None
 
 
+def _board():
+    """A read-only connection to the board that never creates or resets Hermes' side files; None when it cannot be read."""
+    db = os.environ.get("HERMES_KANBAN_DB") or os.path.join(os.path.expanduser("~/.hermes"), "kanban.db")
+    if not os.path.exists(db):
+        return None
+    live = os.path.exists(db + "-wal") and os.path.exists(db + "-shm")
+    try:
+        return sqlite3.connect("file:%s?%s" % (quote(db), "mode=ro&readonly_shm=1" if live else "immutable=1"), uri=True, timeout=2)
+    except sqlite3.Error:
+        return None
+
+
+def _ancestors(limit=6):
+    """The pids above this hook: Hermes itself and whatever started it."""
+    pids, pid = [], os.getppid()
+    while pid > 1 and len(pids) < limit:
+        pids.append(pid)
+        try:
+            pid = int(subprocess.run(["ps", "-o", "ppid=", "-p", str(pid)], capture_output=True, text=True, timeout=3).stdout.strip() or 0)
+        except (OSError, ValueError, subprocess.SubprocessError):
+            break
+    return pids
+
+
+def board_task():
+    """(task id, run id) of the board task this lead is working on, or (None, None) in a chat.
+
+    Hermes does not pass HERMES_KANBAN_TASK on to a hook, so the running task is found on the board:
+    the run whose worker is the Hermes process that started this hook."""
+    if os.environ.get("HERMES_KANBAN_TASK"):
+        return os.environ["HERMES_KANBAN_TASK"], os.environ.get("HERMES_KANBAN_RUN_ID")
+    pids = _ancestors()
+    con = _board() if pids else None
+    if not con:
+        return None, None
+    try:
+        row = con.execute("SELECT task_id, id FROM task_runs WHERE ended_at IS NULL AND worker_pid IN (%s) ORDER BY id DESC LIMIT 1"
+                          % ",".join("?" * len(pids)), pids).fetchone()
+        return (row[0], str(row[1])) if row else (None, None)
+    except sqlite3.Error:
+        return None, None
+    finally:
+        con.close()
+
+
 def own_task(profile, task_id):
     """True for a task the lead may finish without handing out work: its own closing "check and report" task,
     a blocked specialist's question, or another lead's request (it may simply answer)."""
@@ -90,6 +136,34 @@ def goal_reason(args, config):
         return None
     return ("A task for a specialist needs `goal_mode: true` and `goal_max_turns: %d`: without it the specialist often stops "
             "before closing the task and the whole run is repeated. Create the task again with both fields." % GOAL_TURNS)
+
+
+# The real field names of the board tools. Some models append a suffix to a name ("summary_ui", "body_html"); Hermes
+# then drops the field without a word, so a task is created without its body or a run can never be completed.
+FIELDS = {
+    "kanban_create": {"assignee", "board", "body", "completion_contract", "goal_max_turns", "goal_mode", "idempotency_key", "initial_status",
+                      "max_runtime_seconds", "model", "parents", "priority", "project", "provider", "skills", "tenant", "title", "triage",
+                      "workspace_kind", "workspace_path"},
+    "kanban_complete": {"artifacts", "board", "created_cards", "metadata", "result", "summary", "task_id"},
+    "kanban_block": {"board", "kind", "reason", "task_id"},
+    "kanban_comment": {"board", "body", "task_id"},
+    "kanban_request_review": {"board", "metadata", "reviewer", "summary", "task_id"},
+}
+
+
+def field_reason(name, args):
+    """A reason to refuse a board call whose field names are misspelled, or None."""
+    known = FIELDS.get(name)
+    if not known or not isinstance(args, dict):
+        return None
+    wrong = {key: next((f for f in sorted(known, key=len, reverse=True) if str(key).startswith(f + "_")), None)
+             for key in args if key not in known}
+    wrong = {key: field for key, field in wrong.items() if field}
+    if not wrong:
+        return None
+    return ("%s has no field %s. Send the same call again with the exact field name%s: %s. Nothing may be added to a field name."
+            % (name, ", ".join("`%s`" % k for k in wrong), "s" if len(wrong) > 1 else "",
+               ", ".join("`%s` instead of `%s`" % (f, k) for k, f in wrong.items())))
 
 
 def first_time(task_id, run_id, what):
@@ -142,11 +216,14 @@ def check(name, args, config, profile, task_id, run_id):
 
 def main():
     try:
-        task_id = os.environ.get("HERMES_KANBAN_TASK")
+        task_id, run_id = board_task()
         payload = json.load(sys.stdin)
         home = os.environ.get("HERMES_HOME") or ""
         with open(os.path.join(home, "lead_guard.json"), encoding="utf-8") as handle:
             config = json.load(handle)
+        reason = field_reason(str(payload.get("tool_name") or ""), payload.get("tool_input"))
+        if reason:
+            block(reason)
         if not task_id:   # in a chat the lead keeps all its tools; only the tasks it hands out are checked
             reason = goal_reason(payload.get("tool_input"), config) if payload.get("tool_name") == "kanban_create" else None
             if reason:
@@ -154,7 +231,7 @@ def main():
             allow()
         profile = os.environ.get("HERMES_PROFILE") or config.get("lead") or payload.get("profile") or ""   # the board's created_by
         reason = check(str(payload.get("tool_name") or ""), payload.get("tool_input") or {}, config,
-                       profile, task_id, os.environ.get("HERMES_KANBAN_RUN_ID"))
+                       profile, task_id, run_id)
     except SystemExit:
         raise
     except Exception:
