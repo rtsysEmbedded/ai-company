@@ -142,6 +142,11 @@
   .pcard.working { border-color: var(--good); }
   /* ---- flow ---- */
   .flow-now { display: grid; gap: 6px; }
+  .icard { display: grid; gap: 8px; margin-bottom: var(--gap); border-left: 3px solid var(--c, var(--muted)); }
+  .icard.question { --c: var(--warn); } .icard.stopped { --c: var(--bad); } .icard.finished { --c: var(--good); } .icard.handled { opacity: .7; }
+  .icard pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; }
+  .icard textarea { width: 100%; min-height: 64px; }
+  .icard h3 { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
   #side a.item.sub { padding: 4px 8px 4px 22px; font-size: 13px; color: var(--muted); }
   #side a.item.sub[aria-current] { color: inherit; }
   .flow-now .line.nowrap { flex-wrap: nowrap; align-items: baseline; } .flow-now .line.nowrap .dot { flex: none; }
@@ -263,6 +268,7 @@
   <div class="brand"><i>AI</i>AI Company</div>
   <div class="group">Company</div>
   <a class="item" href="#/overview" data-nav="overview"><span class="grow">Overview</span></a>
+  <a class="item" href="#/inbox" data-nav="inbox"><span class="grow">Inbox</span><span class="badge" id="inboxBadge" hidden></span></a>
   <a class="item" href="#/projects" data-nav="projects"><span class="grow">Projects</span></a>
   <div id="projectNav"></div>
   <a class="item" href="#/activity" data-nav="activity"><span class="grow">Activity</span><span class="dot ok pulse" data-live hidden></span></a>
@@ -329,6 +335,13 @@
         </div>
       </div>
       <div class="card"><h2>Knowledge written by agents</h2><p class="muted" style="margin:0 0 8px">Lessons learned, known errors with their fix, how-to procedures, research with sources and decisions. Written by the lead when a job is closed; every agent finds them with a search before it starts.</p><div id="lessons"></div></div>
+    </section>
+
+    <section data-view="inbox" hidden>
+      <div class="row" style="margin-bottom:var(--gap)"><span class="seg" id="inboxProjects"></span><span class="grow"></span>
+        <span class="seg" id="inboxTabs"><button type="button" data-tab="open" aria-pressed="true">Waiting for you</button><button type="button" data-tab="handled" aria-pressed="false">Dealt with</button></span><span class="muted" id="inboxUpdated"></span></div>
+      <div id="inboxList"></div>
+      <p class="muted">The inbox shows what waits for you on the task board, per project: a finished job with the lead's report, a question an agent cannot answer itself, and a task that stopped. Answering a question starts the task again. Accepting a finished job only removes it from this list; “Send back” gives the same agent a new task with your comment.</p>
     </section>
 
     <section data-view="flow" hidden>
@@ -593,6 +606,7 @@ function parseHash() {
   if (p[0] === "software") { const tab = p[1] === "policies" ? "rules" : p[1]; return { view: "dept", dept: "software", tab: DEPT_TABS.some(t => t[0] === tab) ? tab : "team" }; }
   if (p[0] === "d" && p[1]) return { view: "dept", dept: decodeURIComponent(p[1]), tab: DEPT_TABS.some(t => t[0] === p[2]) ? p[2] : "team" };
   if (p[0] === "knowledge" || p[0] === "services" || p[0] === "activity" || p[0] === "office" || p[0] === "projects") return { view: p[0] };
+  if (p[0] === "inbox") return p[1] ? { view: "inbox", project: decodeURIComponent(p.slice(1).join("/")) } : { view: "inbox" };
   if (p[0] === "flow") return p[1] ? { view: "flow", project: decodeURIComponent(p.slice(1).join("/")) } : { view: "flow" };
   return { view: "overview" };
 }
@@ -631,7 +645,7 @@ window.addEventListener("beforeunload", e => { if (draftDirty()) e.preventDefaul
 
 function renderHead() {
   const r = S.route, tabs = $("#tabs");
-  const titles = { projects: ["Projects", "named folders on this Mac"], flow: ["Flow", "which task follows which, and who is on it now"], office: ["Office", "your team at work - click anyone to see what they are doing"], activity: ["Activity", "who is working, on what, and what it cost"], overview: ["Overview", "all departments"], knowledge: ["Knowledge", "shared knowledge base"], services: ["Services", "this machine"] };
+  const titles = { inbox: ["Inbox", "what waits for you: finished jobs, questions and stopped tasks"], projects: ["Projects", "named folders on this Mac"], flow: ["Flow", "which task follows which, and who is on it now"], office: ["Office", "your team at work - click anyone to see what they are doing"], activity: ["Activity", "who is working, on what, and what it cost"], overview: ["Overview", "all departments"], knowledge: ["Knowledge", "shared knowledge base"], services: ["Services", "this machine"] };
   let title, sub, chips = "", list = null, base = "";
   if (r.view === "dept") {
     const loaded = S.d && S.dept === r.dept;
@@ -728,7 +742,7 @@ document.addEventListener("click", async e => {
     await api(`/api/tasks/${enc(b.dataset.archiveTask)}/archive`, { method: "POST" });
     toast("Task archived.");
     if ($("#agentDialog").open) $("#agentDialog").close();
-    const again = { activity: refreshActivity, flow: refreshFlow, office: refreshOffice }[S.route.view];
+    const again = { activity: refreshActivity, flow: refreshFlow, office: refreshOffice, inbox: q => { IN.sig = ""; return refreshInbox(q); } }[S.route.view];
     if (again) again(true);
   } catch (err) { b.disabled = false; toast(err.message, true); }
 });
@@ -743,7 +757,7 @@ document.addEventListener("click", async e => {
     toast(`Task ${r.task_id} is back in the queue${r.assignee ? " for " + r.assignee : ""}.`);
     if ($("#agentDialog").open) $("#agentDialog").close();
     if ($("#convDialog").open) $("#convDialog").close();
-    const again = { activity: refreshActivity, flow: refreshFlow, office: refreshOffice }[S.route.view];
+    const again = { activity: refreshActivity, flow: refreshFlow, office: refreshOffice, inbox: q => { IN.sig = ""; return refreshInbox(q); } }[S.route.view];
     if (again) again(true);
   } catch (err) { b.disabled = false; toast(err.message, true); }
 });
@@ -818,7 +832,7 @@ $("#convAnswer").onsubmit = async e => {
     const r = await api(`/api/tasks/${enc(CV.id)}/answer`, { method: "POST", body: { text } });
     toast(`Answer sent. Task ${r.task_id} continues${r.assignee ? " with " + r.assignee : ""}.`);
     $("#convText").value = ""; CV.sig = ""; await loadConv();
-    const again = { activity: refreshActivity, flow: refreshFlow, office: refreshOffice }[S.route.view];
+    const again = { activity: refreshActivity, flow: refreshFlow, office: refreshOffice, inbox: q => { IN.sig = ""; return refreshInbox(q); } }[S.route.view];
     if (again && !$("#agentDialog").open) again(true);
   } catch (err) { toast(err.message, true); }
   $("#convSend").disabled = false;
@@ -1056,6 +1070,74 @@ $("#projectTaskForm").addEventListener("submit", async e => {
   catch (err) { $("#ptError").textContent = err.message; }
 });
 
+// ================= inbox =================
+const IN = { data: null, tab: "open", timer: null, drafts: {}, sig: "", byProject: {} };
+const IKIND = { question: ["warn", "needs your answer"], stopped: ["bad", "stopped"], finished: ["ok", "finished"] };
+function setInboxBadge(n) { const b = $("#inboxBadge"); b.hidden = !n; b.textContent = n || ""; }
+function inboxCard(i, handled) {
+  const [kind, text] = IKIND[i.kind], can = a => !handled && i.actions.includes(a), draft = IN.drafts[i.id] || "";
+  const box = can("answer") || can("followup");
+  return `<div class="card icard ${i.kind} ${handled ? "handled" : ""}" data-item="${esc(i.id)}">
+    <div class="row">${chip(kind, text)}<a href="${flowHref(i.project.folder || i.folder)}" title="Open this project's flow">${esc(i.project.name)}</a><span class="muted">${esc(i.assignee || "nobody")}${i.dept ? " · " + esc(i.dept) : ""} · ${esc(when(i.at))}${i.tasks > 1 ? ` · ${i.tasks} tasks` : ""}</span><span class="grow"></span><span class="mono muted">${esc(i.task_id)}</span></div>
+    <h3>${esc(i.title)}</h3>${i.job_id !== i.task_id ? `<div class="muted">part of the job “${esc(i.job_title)}”</div>` : ""}
+    <pre>${esc(i.text)}</pre>
+    ${box ? `<textarea data-text aria-label="Your text" placeholder="${can("answer") ? (i.kind === "question" ? "Your answer. The task starts again with it." : "A note for the agent, then Send answer. Or press Retry to start it again as it is.") : "What should be changed or added? This goes to " + esc(i.assignee || "the agent") + " as a new task."}">${esc(draft)}</textarea>` : ""}
+    <div class="row">${can("answer") ? `<button class="btn primary" type="button" data-do="answer">Send answer</button>` : ""}${can("accept") ? `<button class="btn primary" type="button" data-do="accept">Accept</button>` : ""}${can("followup") ? `<button class="btn" type="button" data-do="followup">Send back with this comment</button>` : ""}${can("retry") ? `<button class="btn" type="button" data-retry-task="${esc(i.task_id)}">Retry</button>` : ""}
+      <button class="btn" type="button" data-conv-task="${esc(i.report_task || i.task_id)}">All messages</button><span class="grow"></span>${can("archive") ? `<button class="btn danger" type="button" data-archive-task="${esc(i.task_id)}">Archive</button>` : ""}${handled ? `<button class="btn" type="button" data-do="reopen">Put back in the inbox</button>` : i.kind !== "finished" ? `<button class="btn" type="button" data-do="accept" title="Remove from this list without changing the task">Dealt with</button>` : ""}</div></div>`;
+}
+function renderInbox(d) {
+  IN.data = d; IN.byProject = d.by_project; setInboxBadge(d.count);
+  $("#inboxUpdated").textContent = "updated " + new Date(d.now * 1000).toLocaleTimeString();
+  $$("#inboxTabs button").forEach(b => b.setAttribute("aria-pressed", b.dataset.tab === IN.tab));
+  const all = IN.tab === "open" ? d.items : d.handled, want = S.route.project, names = new Map();
+  for (const i of all) names.set(i.project.key, { name: i.project.name, n: (names.get(i.project.key)?.n || 0) + 1 });
+  $("#inboxProjects").innerHTML = [["", `All ${all.length}`], ...[...names].map(([k, v]) => [k, `${v.name} ${v.n}`])].map(([k, label]) => `<button type="button" data-key="${esc(k)}" aria-pressed="${k === (want || "")}">${esc(label)}</button>`).join("");
+  $$("#inboxProjects button").forEach(b => b.onclick = () => { location.hash = b.dataset.key ? "#/inbox/" + enc(b.dataset.key) : "#/inbox"; });
+  const list = all.filter(i => !want || i.project.key === want);
+  // Keep what the user is typing: the list is rebuilt only when its items changed.
+  const sig = IN.tab + "|" + (want || "") + "|" + list.map(i => i.id + i.text.length).join(",");
+  if (sig === IN.sig) return;
+  IN.sig = sig;
+  $("#inboxList").innerHTML = list.length ? list.map(i => inboxCard(i, IN.tab !== "open")).join("")
+    : `<div class="card"><b>${IN.tab === "open" ? "Nothing waits for you" + (want ? " in this project" : "") + "." : "Nothing here yet."}</b><p class="muted" style="margin:6px 0 0">${IN.tab === "open" ? "Finished jobs, questions from agents and stopped tasks appear here." : "Items you accepted or marked as dealt with are listed here."}</p></div>`;
+}
+async function refreshInbox(quiet) {
+  try { renderInbox(await api("/api/inbox")); }
+  catch (e) { if (!quiet) throw e; $("#inboxUpdated").textContent = "update failed: " + e.message; }
+}
+$("#inboxTabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (!b || !IN.data) return; IN.tab = b.dataset.tab; IN.sig = ""; renderInbox(IN.data); });
+$("#inboxList").addEventListener("input", e => { const card = e.target.closest("[data-item]"); if (card && e.target.matches("[data-text]")) IN.drafts[card.dataset.item] = e.target.value; });
+$("#inboxList").addEventListener("click", async e => {
+  const b = e.target.closest("[data-do]"); if (!b) return;
+  const card = b.closest("[data-item]"), id = card.dataset.item, i = [...IN.data.items, ...IN.data.handled].find(x => x.id === id), text = (card.querySelector("[data-text]")?.value || "").trim();
+  const mark = done => api("/api/inbox/done", { method: "POST", body: { id, done } });
+  b.disabled = true;
+  try {
+    if (b.dataset.do === "answer") {
+      if (!text) { toast("Write your answer first.", true); b.disabled = false; return; }
+      const r = await api(`/api/tasks/${enc(i.task_id)}/answer`, { method: "POST", body: { text } });
+      toast(`Answer sent. ${r.assignee || "The agent"} continues${r.continued_from ? " in task " + r.task_id : ""}.`);
+    } else if (b.dataset.do === "followup") {
+      if (!text) { toast("Write what should be changed first.", true); b.disabled = false; return; }
+      const r = await api(`/api/agents/${enc(i.assignee)}/task`, { method: "POST", body: { title: (i.job_title.replace(/ - follow-up$/, "") + " - follow-up").slice(0, 160), folder: i.folder,
+        body: `${text}\n\nThis continues the finished job ${i.job_id} “${i.job_title}”. Its report was:\n${i.text.slice(0, 3000)}` } });
+      await mark(true); toast(`Sent back to ${r.assignee} as task ${r.task_id}.`);
+    } else if (b.dataset.do === "accept") { await mark(true); toast(i.kind === "finished" ? "Accepted." : "Marked as dealt with."); }
+    else if (b.dataset.do === "reopen") { await mark(false); toast("Back in the inbox."); }
+    delete IN.drafts[id]; IN.sig = ""; await refreshInbox(true);
+  } catch (err) { b.disabled = false; toast(err.message, true); }
+});
+loaders.inbox = async () => {
+  IN.sig = "";
+  try { const r = await api("/api/projects"); P.list = r.projects; renderProjectNav(); } catch {}
+  await refreshInbox();
+  clearInterval(IN.timer);
+  IN.timer = setInterval(() => { if (S.route.view !== "inbox") { clearInterval(IN.timer); IN.timer = null; return; } if (!document.hidden) refreshInbox(true); }, 8000);
+};
+// The number on the sidebar, on every page.
+const inboxCount = async () => { try { const r = await api("/api/inbox/count"); setInboxBadge(r.count); IN.byProject = r.by_project; } catch {} };
+inboxCount(); setInterval(() => { if (!document.hidden && S.route.view !== "inbox") inboxCount(); }, 30000);
+
 // ================= flow =================
 const F = { timer: null, project: null, data: null, sig: "", seen: null };
 const P = { list: [], suggestions: [], edit: null, task: null };
@@ -1171,7 +1253,7 @@ function renderFlow(d) {
   const open = proj.tasks.filter(t => ["running", "ready", "todo", "review", "scheduled"].includes(t.status)).length, done = proj.tasks.filter(t => t.status === "done").length;
   const spent = proj.tasks.reduce((n, t) => n + (t.usage?.cost || 0), 0) + proj.direct.reduce((n, x) => n + (x.usage?.cost || 0), 0);
   $("#flowProject").hidden = false;
-  $("#flowProject").innerHTML = `<div class="row"><h2 class="grow" style="margin:0">${esc(proj.name)}</h2>${chip("", `${proj.tasks.length} task${proj.tasks.length === 1 ? "" : "s"}`)}${open ? chip("warn", `${open} open`) : ""}${done ? chip("ok", `${done} done`) : ""}${stuck.length ? chip("bad", `${stuck.length} blocked`) : ""}${spent ? chip("", `~$${spent.toFixed(spent < 1 ? 3 : 2)}`) : ""}
+  $("#flowProject").innerHTML = `<div class="row"><h2 class="grow" style="margin:0">${esc(proj.name)}</h2>${chip("", `${proj.tasks.length} task${proj.tasks.length === 1 ? "" : "s"}`)}${open ? chip("warn", `${open} open`) : ""}${done ? chip("ok", `${done} done`) : ""}${stuck.length ? chip("bad", `${stuck.length} blocked`) : ""}${(IN.byProject || {})[reg ? reg.id : proj.key] ? `<a class="chip warn" href="#/inbox/${enc(reg ? reg.id : proj.key)}">${IN.byProject[reg ? reg.id : proj.key]} in your inbox</a>` : ""}${spent ? chip("", `~$${spent.toFixed(spent < 1 ? 3 : 2)}`) : ""}
       ${reg ? `<button class="btn primary" type="button" id="flowNewTask">New task</button>` : proj.key ? `<a class="btn" href="#/projects">Add as project</a>` : ""}</div>
     <div class="muted mono" style="overflow-wrap:anywhere">${esc(proj.key || "tasks without a project folder")}</div>${reg?.goal ? `<p style="margin:6px 0 0"><b>Goal:</b> ${esc(reg.goal)}</p>` : ""}${reg?.note ? `<p class="muted" style="margin:4px 0 0">${esc(reg.note)}</p>` : ""}`;
   if ($("#flowNewTask")) $("#flowNewTask").onclick = () => openProjectTask(reg);

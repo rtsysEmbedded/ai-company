@@ -126,10 +126,12 @@ import backup_api  # noqa: E402
 app.include_router(backup_api.build_router(auth))
 
 import budget_api  # noqa: E402
+import inbox_api
 import projects_api  # noqa: E402
 
 app.include_router(projects_api.build_router(auth))
 app.include_router(budget_api.build_router(auth))
+app.include_router(inbox_api.build_router(auth))
 
 
 # ---------- helpers ----------
