@@ -65,7 +65,7 @@ Measured with the new `inspect_document` tool:
 - Fixed tool set (box, cylinder, sphere, one bracket) with no positioning, no boolean
   operations, no export and no way to check a result, so nothing beyond single primitives
   could have been built even if the server had worked.
-- Hard-coded `/Users/pershan/...` and `/Applications/FreeCAD.app` paths; not portable.
+- Hard-coded user-specific home-directory and `/Applications/FreeCAD.app` paths; not portable.
 - Stray scripts were left in the home directory.
 
 ## What replaced it
